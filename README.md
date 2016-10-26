@@ -13,7 +13,7 @@ this service can easily be run in a WebWorker,
 confining the cryptographic material in a dedicated thread.
 
 ## cryptographic material is encapsulated
-client code manages proxies of the openpgp keys,
+client code operates on mere proxies of the openpgp keys, not the latter.
 each key proxy includes a handle (reference) to the corresponding openpgp key.
 
 the handle is a unique cryptographically secure random string,
@@ -30,8 +30,8 @@ client code can still fetch a new instance from the service, whenever required.
 the service also invalidates a proxy handle when an openpgp operation
 mutates a key's state.
 
-in the current API, only the `lock` method which encrypts a private key
-hence clearly mutates the key.
+in the current API, only the `lock` method (which encrypts a private key)
+clearly mutates the key.
 after a key is locked by the service,
 all proxies to the unlocked state become invalid.
 
@@ -54,7 +54,7 @@ const passphrase = 'passphrase to decrypt private key'
 
 // import the key and unlock it
 const key = service.getKeysFromArmor(armor).then(keys => keys[0])
-const unlocked = key.then(key => service.unlock(key.handle, secret))
+const unlocked = key.then(key => service.unlock(key.handle, passphrase))
 
 // encrypt with public key
 const cipher = key.then(key => service.encode(key.handle, 'rob says wow!'))
