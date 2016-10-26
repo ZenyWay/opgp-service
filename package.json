@@ -41,10 +41,12 @@
   },
   "homepage": "https://github.com/zenyway/opgp-service#readme",
   "dependencies": {
+    "bluebird": "^3.4.6",
     "csrkey-cache": "^1.0.0",
     "tslib": "^1.0.0"
   },
   "devDependencies": {
+    "@types/bluebird": "^3.0.35",
     "@types/jasmine": "^2.5.35",
     "@types/node": "^4.0.30",
     "aliasify": "^2.0.0",
