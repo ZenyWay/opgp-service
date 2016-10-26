@@ -1,0 +1,78 @@
+{
+  "name": "opgp-service",
+  "version": "1.0.0",
+  "description": "a thin wrapper for openpgp exposing core functionality built on ephemeral immutable keys over an API that does not leak cryptographic material.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "predist": "mkdirp dist && rimraf dist/*",
+    "dist": "tsc -p src --outDir dist",
+    "prepublish": "npm run dist",
+    "pretest": "mkdirp spec/reports && rimraf spec/reports/*",
+    "test": "karma start spec/karma.conf.js --single-run",
+    "test:debug": "karma start spec/karma.conf.js --no-single-run",
+    "test:coverage": "npm run pretest && karma start spec/karma-coverage.conf.js --single-run && remap-istanbul -i spec/reports/coverage/chrom*/coverage.json -o spec/reports/coverage -t html && http-server -c-1 -o -p 8888 spec/reports/coverage",
+    "pretest:ci": "mkdirp spec/reports/coverage && rimraf spec/reports/coverage",
+    "test:ci:coveralls": "cat spec/reports/coverage/lcov.info | sed -e 's/SF:\\.\\.\\//SF:/' | coveralls",
+    "test:ci": "karma start spec/karma-coverage.conf.js --single-run && remap-istanbul -i spec/reports/coverage/chrom*/coverage.json -o spec/reports/coverage/lcov.info -t lcovonly",
+    "test:web:serve": "http-server -c-1 -o -p 6510 spec/web",
+    "pretest:web": "rimraf spec/web/*.js",
+    "test:web": "browserify spec/*.spec.ts -p [ tsify --project spec ] -t aliasify -t uglifyify -o spec/web/index.spec.js && npm run test:web:serve"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zenyway/opgp-service.git"
+  },
+  "keywords": [
+    "cache",
+    "lru-cache",
+    "csrng",
+    "crypto",
+    "webcrypto",
+    "node"
+  ],
+  "author": {
+    "name": "Stephane M. Catala",
+    "email": "stephane@zenyway.com"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "bugs": {
+    "url": "https://github.com/zenyway/opgp-service/issues"
+  },
+  "homepage": "https://github.com/zenyway/opgp-service#readme",
+  "dependencies": {
+    "csrkey-cache": "^1.0.0",
+    "tslib": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/jasmine": "^2.5.35",
+    "@types/node": "^4.0.30",
+    "aliasify": "^2.0.0",
+    "browserify": "^13.1.0",
+    "browserify-istanbul": "^2.0.0",
+    "concurrently": "^3.1.0",
+    "coveralls": "^2.11.14",
+    "cpx": "^1.5.0",
+    "eslint": "^3.8.1",
+    "http-server": "^0.9.0",
+    "istanbul": "^0.4.5",
+    "jasmine-core": "^2.5.2",
+    "karma": "^1.3.0",
+    "karma-browserify": "^5.1.0",
+    "karma-chrome-launcher": "^2.0.0",
+    "karma-coverage": "^1.1.1",
+    "karma-firefox-launcher": "^1.0.0",
+    "karma-jasmine": "^1.0.2",
+    "karma-jasmine-html-reporter": "^0.2.2",
+    "karma-junit-reporter": "^1.1.0",
+    "karma-safari-launcher": "^1.0.0",
+    "karma-spec-reporter": "0.0.26",
+    "mkdirp": "^0.5.1",
+    "remap-istanbul": "^0.7.0",
+    "rimraf": "^2.5.4",
+    "tsify": "^2.0.2",
+    "typescript": "^2.0.6",
+    "uglifyify": "^3.0.4",
+    "watchify": "^3.7.0"
+  }
+}
