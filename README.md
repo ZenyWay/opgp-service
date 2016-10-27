@@ -60,17 +60,18 @@ const armor =
 const passphrase = 'passphrase to decrypt private key'
 
 // import the key and unlock it
-const key = service.getKeysFromArmor(armor).then(keys => keys[0])
-const unlocked = key.then(key => service.unlock(key.handle, passphrase))
+const key = service.getKeysFromArmor(armor)
+const unlocked = key.then(key => service.unlock(key, passphrase))
 
 // encrypt with public key, sign with private
-const cipher = key.then(key => service.encrypt(key.handle, 'rob says wow!'))
-.tap(log)
+const cipher = unlocked
+.then(key => service.encrypt({ cipher: key, auth: key }, 'rob says wow!'))
+.tap(log) // '-----BEGIN PGP MESSAGE----- ... -----END PGP MESSAGE-----'
 
 // decrypt with decrypted private key, verify signature with public
 const plain = Promise.join(unlocked, cipher,
-  (unlocked, cipher) => service.decrypt(unlocked.handle, cipher))
-.tap(log)
+(unlocked, cipher) => service.decrypt({ cipher: key, auth: key }, cipher))
+.tap(log) // 'rob says wow!'
 ```
 
 # <a name="api"></a> API
