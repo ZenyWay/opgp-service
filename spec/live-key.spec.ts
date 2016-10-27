@@ -152,16 +152,23 @@ describe('OpgpLiveKey', () => {
     })
   })
 
-  describe('armor (): string', () => {
+  describe('armor (): Promise<string>', () => {
     let armor: any
-    beforeEach(() => {
+    beforeEach((done) => {
       const getLiveKey = getLiveKeyFactory({ openpgp: openpgp })
-      armor = getLiveKey(key).armor()
+      getLiveKey(key).armor()
+      .then(_armor => armor = _armor)
+      .finally(() => setTimeout(done))
     })
 
     it('returns an armored string representation of the wrapped openpgp key', () => {
       expect(key.armor).toHaveBeenCalled()
       expect(armor).toBe('key-armor')
     })
+  })
+
+  describe('unlock (passphrase: string, opts?: LiveKeyUnlockOpts): ' +
+  'Promise<OpgpLiveKey>', () => {
+
   })
 })

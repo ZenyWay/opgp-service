@@ -68,7 +68,7 @@ export interface OpgpLiveKey {
    *
    * @memberOf LiveKey
    */
-  armor (): string
+  armor (): Promise<string>
   /**
    *
    * @param {string} passphrase
@@ -152,20 +152,17 @@ class LiveKeyClass implements OpgpLiveKey {
     return LiveKeyClass.getInstance.bind(LiveKeyClass, utils)
   }
 
-  armor (): string {
-    return this.key.armor()
+  armor (): Promise<string> {
+    return Promise.resolve(this.key.armor())
   }
 
   unlock (passphrase: string, opts?: LiveKeyUnlockOpts): Promise<OpgpLiveKey> {
-  	return !this.bp.isLocked ? Promise.resolve(this) : Promise.try(() => {
-      try {
-        const clone = this.utils.cloneKey(this.key) // mutate clone, not this.key
-        return LiveKeyClass.getInstance(this.utils, clone.decrypt(passphrase))
-      } catch (err) {
-        // fallback to this locked key if unlock fails
-      }
-      return this
+  	return !this.bp.isLocked ? Promise.resolve(this)
+    : Promise.try(() => {
+      const clone = this.utils.cloneKey(this.key) // mutate clone, not this.key
+      return LiveKeyClass.getInstance(this.utils, clone.decrypt(passphrase))
     })
+    .catch(err => this) // fallback to this locked key if unlock fails
   }
 
   lock (passphrase: string, opts?: LiveKeyLockOpts): Promise<OpgpLiveKey> {
