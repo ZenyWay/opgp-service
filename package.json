@@ -1,7 +1,7 @@
 {
   "name": "opgp-service",
   "version": "1.0.0",
-  "description": "a thin wrapper for openpgp exposing core functionality built on ephemeral immutable keys over an API that does not leak cryptographic material.",
+  "description": "a fully async API for openpgp that builds on ephemeral immutable keys and that does not leak cryptographic material.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

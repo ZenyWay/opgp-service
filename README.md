@@ -4,18 +4,21 @@
 [![coverage status](https://coveralls.io/repos/github/ZenyWay/opgp-service/badge.svg?branch=master)](https://coveralls.io/github/ZenyWay/opgp-service)
 [![Dependency Status](https://gemnasium.com/badges/github.com/ZenyWay/opgp-service.svg)](https://gemnasium.com/github.com/ZenyWay/opgp-service)
 
-a thin wrapper for openpgp exposing core functionality
-built on ephemeral immutable keys
-over an API that does not leak cryptographic material.
+a fully async API for [openpgp](https://openpgpjs.org/)
+that builds on ephemeral immutable keys and
+that does not leak cryptographic material.
 
 together with [worker-proxy](https://www.npmjs.com/package/worker-proxy),
 this service can easily be run in a WebWorker,
-confining the cryptographic material in a dedicated thread.
+confining the cryptographic material into a dedicated thread.
+
+the current version exposes a subset of [openpgp](https://openpgpjs.org/)'s
+functionality.
 
 ## cryptographic material is encapsulated
 client code operates on mere proxies of the openpgp keys, not the latter.
-each key proxy includes a handle (reference) to the corresponding openpgp key.
 
+each key proxy includes a handle (reference) to the corresponding openpgp key.
 the handle is a unique cryptographically secure random string,
 completely independent from the referenced cryptographic material,
 which remains well contained within the `opgp-service` instance
@@ -30,20 +33,24 @@ client code can still fetch a new instance from the service, whenever required.
 the service also invalidates a proxy handle when an openpgp operation
 mutates a key's state.
 
-in the current API, only the `lock` method (which encrypts a private key)
-clearly mutates the key.
-after a key is locked by the service,
-all proxies to the unlocked state become invalid.
+in the current API, only the `lock` method, which encrypts a private key,
+mutates the key.
+when a key is locked, all proxies to the unlocked state become stale.
 
 key proxies always represent a key in an immutable state.
 this hinders coupling in client code through the service API.
+
+## fully async
+async all the way streamlines error-control flow:
+* all API methods return a `Promise`.
+* any exception thrown by `openpgp` is converted into a rejected `Promise`.
 
 # <a name="example"></a> EXAMPLE
 ```javascript
 import getService from 'opgp-service'
 import * as bluebird from 'bluebird'
 
-const service = getService()
+const service = getService() // use defaults
 
 const armor =
   ['-----BEGIN PGP PRIVATE KEY BLOCK-----',
@@ -56,13 +63,13 @@ const passphrase = 'passphrase to decrypt private key'
 const key = service.getKeysFromArmor(armor).then(keys => keys[0])
 const unlocked = key.then(key => service.unlock(key.handle, passphrase))
 
-// encrypt with public key
-const cipher = key.then(key => service.encode(key.handle, 'rob says wow!'))
+// encrypt with public key, sign with private
+const cipher = key.then(key => service.encrypt(key.handle, 'rob says wow!'))
 .tap(log)
 
-// decrypt with decrypted private key
+// decrypt with decrypted private key, verify signature with public
 const plain = Promise.join(unlocked, cipher,
-  (unlocked, cipher) => service.decode(unlocked.handle, cipher))
+  (unlocked, cipher) => service.decrypt(unlocked.handle, cipher))
 .tap(log)
 ```
 
