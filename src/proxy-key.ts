@@ -12,6 +12,25 @@
  * Limitations under the License.
  */
 ;
+import { __assign as assign } from 'tslib'
+
+/**
+ * @function
+ * factory
+ *
+ * @param {string} handle
+ * @param {OpgpKeyBlueprint} blueprint
+ *
+ * @return {OpgpProxyKey} instance,
+ * defensively copied from the arguments
+ *
+ * @export
+ * @interface OpgpProxyKeyFactory
+ */
+export interface OpgpProxyKeyFactory {
+  (handle: string, blueprint: OpgpKeyBlueprint): OpgpProxyKey
+}
+
 export interface OpgpProxyKey extends OpgpKeyBlueprint {
   handle: string
 }
@@ -38,3 +57,26 @@ export interface OpgpKeyId {
 export interface OpgpKeyUser {
   ids: string[]
 }
+
+/**
+ * @function
+ * factory
+ *
+ * @param {string} handle
+ * @param {OpgpKeyBlueprint} blueprint
+ *
+ * @return {OpgpProxyKey} instance,
+ * defensively copied from the arguments
+ *
+ * @export
+ * @interface OpgpProxyKeyFactory
+ */
+const getProxyKey: OpgpProxyKeyFactory
+= function (handle: string, blueprint: OpgpKeyBlueprint): OpgpProxyKey {
+  const proxy = <OpgpProxyKey> assign({ handle: handle }, blueprint )
+  proxy.keys = blueprint.keys.map(keyId => assign({}, keyId))
+  proxy.user = { ids: blueprint.user.ids.slice() }
+  return proxy
+}
+
+export default getProxyKey
