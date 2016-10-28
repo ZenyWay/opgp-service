@@ -157,18 +157,20 @@ class LiveKeyClass implements OpgpLiveKey {
   }
 
   unlock (passphrase: string, opts?: LiveKeyUnlockOpts): Promise<OpgpLiveKey> {
-  	return !this.bp.isLocked ? Promise.resolve(this)
+  	return !isString(passphrase) || !this.bp.isLocked ? Promise.resolve(this)
     : Promise.try(() => {
       const clone = this.utils.cloneKey(this.key) // mutate clone, not this.key
-      return LiveKeyClass.getInstance(this.utils, clone.decrypt(passphrase))
+      const unlocked = clone.decrypt(passphrase)
+      return unlocked ? LiveKeyClass.getInstance(this.utils, clone) : this
     })
-    .catch(err => this) // fallback to this locked key if unlock fails
   }
 
   lock (passphrase: string, opts?: LiveKeyLockOpts): Promise<OpgpLiveKey> {
   	return this.bp.isLocked ? Promise.resolve(this)
-    : Promise.try(() =>
-      LiveKeyClass.getInstance(this.utils, this.key.encrypt(passphrase)))
+    : Promise.try(() => {
+        this.key.encrypt(passphrase)
+        return LiveKeyClass.getInstance(this.utils, this.key)
+      })
       .finally (() => delete this.key) // systematically invalidate this {LiveKey}
   }
 
@@ -399,6 +401,10 @@ function isLocked (key: any): boolean {
 function getExpiry (key: any): number {
 	const expires = key.getExpirationTime()
 	return expires ? expires.getTime() : Infinity
+}
+
+function isString (val: any): val is String {
+  return typeof (val && val.valueOf()) === 'string'
 }
 
 const getLiveKeyFactory: LiveKeyFactoryBuilder = LiveKeyClass.getFactory
