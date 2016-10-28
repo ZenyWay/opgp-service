@@ -188,7 +188,7 @@ describe('OpgpLiveKey', () => {
 
   describe('unlock (passphrase: string, opts?: LiveKeyUnlockOpts): ' +
   'Promise<OpgpLiveKey>', () => {
-    let err: any
+    let error: any
     let result: any
     let unlocked: any
     beforeEach(() => {
@@ -205,14 +205,14 @@ describe('OpgpLiveKey', () => {
         })
 
         livekey.unlock('correct passphrase')
-        .then((_unlocked: any) => result = _unlocked)
-        .catch((_err: any) => err = _err)
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
       })
 
       it('returns a Promise that resolves to a new, '
       + 'unlocked {OpgpLiveKey} instance', () => {
-        expect(err).not.toBeDefined()
+        expect(error).not.toBeDefined()
         expect(result).not.toBe(livekey)
         expect(result.bp.isLocked).toBe(false)
       })
@@ -229,14 +229,14 @@ describe('OpgpLiveKey', () => {
         key.decrypt.and.returnValue(false)
 
         livekey.unlock('incorrect passphrase')
-        .then((locked: any) => result = locked)
-        .catch((_err: any) => err = _err)
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
       })
 
       it('returns a Promise that resolves to its {OpgpLiveKey} instance',
       () => {
-        expect(err).not.toBeDefined()
+        expect(error).not.toBeDefined()
         expect(result).toBe(livekey)
       })
       it('does not change the state of its {OpgpLiveKey} instance', () => {
@@ -250,14 +250,14 @@ describe('OpgpLiveKey', () => {
       beforeEach((done) => {
         livekey = getLiveKey(unlocked)
 
-        livekey.unlock('incorrect passphrase')
-        .then((locked: any) => result = locked)
-        .catch((_err: any) => err = _err)
+        livekey.unlock('passphrase')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
       })
 
       it('returns a Promise that resolves to its {OpgpLiveKey} instance', () => {
-        expect(err).not.toBeDefined()
+        expect(error).not.toBeDefined()
         expect(result).toBe(livekey)
       })
       it('does not change the state of its {OpgpLiveKey} instance', () => {
@@ -271,20 +271,93 @@ describe('OpgpLiveKey', () => {
       beforeEach((done) => {
         key.decrypt.and.throwError('boom');
 
-        livekey.unlock('incorrect passphrase')
+        livekey.unlock('passphrase')
         .then((res: any) => result = res)
-        .catch((_err: any) => err = _err)
+        .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
       })
 
       it('returns a Promise that rejects with the corresponding error', () => {
-        expect(err).toEqual(jasmine.any(Error))
-        expect(err.message).toBe('boom')
+        expect(error).toEqual(jasmine.any(Error))
+        expect(error.message).toBe('boom')
       })
       it('does not change the state of its {OpgpLiveKey} instance', () => {
         expect(livekey.key).toBe(key)
         expect(livekey.key.primaryKey.isDecrypted).toBe(false)
         expect(livekey.bp.isLocked).toBe(true)
+      })
+    })
+  })
+
+  describe('lock (passphrase: string, opts?: LiveKeyUnlockOpts): ' +
+  'Promise<OpgpLiveKey>', () => {
+    let error: any
+    let result: any
+    let unlocked: any
+    beforeEach(() => {
+      unlocked = cloneKey(key)
+      unlocked.primaryKey.isDecrypted = true
+    })
+
+    describe('when given a passphrase', () => {
+      beforeEach((done) => {
+        unlocked.encrypt = jasmine.createSpy('encrypt')
+        .and.callFake(() => unlocked.primaryKey.isDecrypted = false)
+        livekey = getLiveKey(unlocked)
+
+        livekey.lock('passphrase')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('returns a Promise that resolves to a new, '
+      + 'locked {OpgpLiveKey} instance', () => {
+        expect(error).not.toBeDefined()
+        expect(result).not.toBe(livekey)
+        expect(result.bp.isLocked).toBe(true)
+      })
+      it('invalidates its {OpgpLiveKey} instance', () => {
+        expect(livekey.key).not.toBeDefined()
+      })
+    })
+
+    describe('when its {OpgpLiveKey} is already locked', () => {
+      beforeEach((done) => {
+        livekey.lock('passphrase')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('returns a Promise that resolves to its {OpgpLiveKey} instance', () => {
+        expect(error).not.toBeDefined()
+        expect(result).toBe(livekey)
+      })
+      it('does not change the state of its {OpgpLiveKey} instance', () => {
+        expect(livekey.key).toBe(key)
+        expect(livekey.key.primaryKey.isDecrypted).toBe(false)
+        expect(livekey.bp.isLocked).toBe(true)
+      })
+    })
+
+    describe('when the openpgp primitive throws an exception', () => {
+      beforeEach((done) => {
+        key.encrypt.and.throwError('boom');
+        livekey = getLiveKey(unlocked)
+
+        livekey.lock('incorrect passphrase')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('returns a Promise that rejects with the corresponding error', () => {
+        expect(error).toEqual(jasmine.any(Error))
+        expect(error.message).toBe('boom')
+      })
+      it('invalidates its {OpgpLiveKey} instance', () => {
+        expect(livekey.key).not.toBeDefined()
       })
     })
   })
