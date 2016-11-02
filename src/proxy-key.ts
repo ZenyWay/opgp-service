@@ -27,7 +27,7 @@ import { __assign as assign } from 'tslib'
  * @export
  * @interface OpgpProxyKeyFactory
  */
-export interface OpgpProxyKeyFactory {
+export interface ProxyKeyFactory {
   (handle: string, blueprint: OpgpKeyBlueprint): OpgpProxyKey
 }
 
@@ -71,7 +71,7 @@ export interface OpgpKeyUser {
  * @export
  * @interface OpgpProxyKeyFactory
  */
-const getProxyKey: OpgpProxyKeyFactory
+const getProxyKey: ProxyKeyFactory
 = function (handle: string, blueprint: OpgpKeyBlueprint): OpgpProxyKey {
   const proxy = <OpgpProxyKey> assign({ handle: handle }, blueprint )
   proxy.keys = blueprint.keys.map(keyId => assign({}, keyId))

@@ -12,8 +12,8 @@
  * Limitations under the License.
  */
 ;
-import getLiveKeyFactory, { OpgpLiveKey } from './live-key'
-import getProxyKey, { OpgpProxyKey } from './proxy-key'
+import getLiveKeyFactory, { LiveKeyFactory, OpgpLiveKey } from './live-key'
+import getProxyKey, { ProxyKeyFactory, OpgpProxyKey } from './proxy-key'
 import getCache, { CsrKeyCache } from 'csrkey-cache'
 import * as Promise from 'bluebird'
 import { __assign as assign } from 'tslib'
@@ -24,6 +24,9 @@ export interface OpgpServiceFactory {
 
 export interface OpgpServiceFactoryConfig {
   cache?: CsrKeyCache<OpgpLiveKey>
+  getLiveKey?: LiveKeyFactory
+  getProxyKey?: ProxyKeyFactory
+  openpgp?: any
 }
 
 export interface OpgpService {
@@ -138,12 +141,25 @@ export interface CommonOpts {
 class OpgpServiceClass implements OpgpService {
   static getInstance: OpgpServiceFactory =
   function (config?: OpgpServiceFactoryConfig): OpgpService {
-    const cache = config && config.cache || getCache<OpgpLiveKey>()
-    return new OpgpServiceClass(cache)
+    const spec = assign({}, config)
+    const cache = spec.cache || getCache<OpgpLiveKey>()
+    const openpgp = getOpenpgp(spec.openpgp)
+    const getLiveKey = spec.getLiveKey || getLiveKeyFactory(openpgp)
+    return new OpgpServiceClass(cache, getLiveKey, spec.getProxyKey || getProxyKey, openpgp)
   }
 
-  getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts): Promise<OpgpProxyKey[]|OpgpProxyKey> {
-    return
+  getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)
+  : Promise<OpgpProxyKey[]|OpgpProxyKey> {
+  	return Promise.try(() => {
+    	const keys = this.openpgp.key.readArmored(armor).keys
+			.map((key: any) => {
+      	const livekey = this.getLiveKey(key)
+        const handle = this.cache.set(livekey)
+      	return handle ? this.getProxyKey(handle, livekey.bp)
+        : Promise.reject(new Error('unrecoverable error'))
+      })
+      return keys.length > 1 ? keys : keys[0]
+    })
   }
 
   encrypt (proxies: ProxyKeyMap, plain: string, opts?: EncryptOpts): Promise<string> {
@@ -162,7 +178,23 @@ class OpgpServiceClass implements OpgpService {
     return
   }
 
-  constructor (private cache: CsrKeyCache<OpgpLiveKey>) {}
+  constructor (
+    private cache: CsrKeyCache<OpgpLiveKey>,
+    private getLiveKey: LiveKeyFactory,
+    private getProxyKey: ProxyKeyFactory,
+    private openpgp: any
+  ) {}
+}
+
+function getOpenpgp (config: any): any {
+  const openpgp = isOpenpgp(config) ? config : require('openpgp')
+  // TODO configure openpgp
+  return openpgp
+}
+
+function isOpenpgp (val: any): boolean {
+  return !!val && [ 'crypto', 'key', 'message' ]
+  .every(prop => !!val[prop])
 }
 
 const getOpgpService = OpgpServiceClass.getInstance
