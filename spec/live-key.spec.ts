@@ -166,30 +166,47 @@ describe('OpgpLiveKey', () => {
   })
 
   describe('armor (): Promise<string>', () => {
-    let armor: any
-    beforeEach((done) => {
-      livekey.armor()
-      .then((_armor: any) => armor = _armor)
-      .finally(() => setTimeout(done))
+    describe('when the openpgp primitive succeeds', () => {
+      let error: any
+      let result: any
+      beforeEach((done) => {
+        livekey.armor()
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('returns a Promise that resolves to an armored string representation ' +
+      'of the wrapped openpgp key when the openpgp primitive succeeds', () => {
+        expect(key.armor).toHaveBeenCalled()
+        expect(result).toBe('key-armor')
+        expect(error).not.toBeDefined()
+      })
     })
 
-    it('returns a Promise that resolves to an armored string representation ' +
-    'of the wrapped openpgp key when the openpgp primitive succeeds', () => {
-      expect(key.armor).toHaveBeenCalled()
-      expect(armor).toBe('key-armor')
-    })
+    describe('when the openpgp primitive fails', () => {
+      let error: any
+      let result: any
+      beforeEach((done) => {
+        key.armor.and.throwError('boom')
+        livekey.armor()
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
 
-    it('returns a Promise that rejects with the error ' +
-    'from the openpgp primitive when it fails', () => {
-      expect(key.armor).toHaveBeenCalled()
-      expect(armor).toBe('key-armor')
+      it('returns a Promise that rejects with the error ' +
+      'from the openpgp primitive when it fails', () => {
+        expect(key.armor).toHaveBeenCalled()
+        expect(result).not.toBeDefined()
+        expect(error).toBeDefined()
+        expect(error.message).toBe('boom')
+      })
     })
   })
 
   describe('unlock (passphrase: string, opts?: LiveKeyUnlockOpts): ' +
   'Promise<OpgpLiveKey>', () => {
-    let error: any
-    let result: any
     let unlocked: any
     beforeEach(() => {
       unlocked = cloneKey(key)
@@ -197,6 +214,8 @@ describe('OpgpLiveKey', () => {
     })
 
     describe('when given the correct passphrase', () => {
+      let error: any
+      let result: any
       beforeEach((done) => {
         openpgp.key.readArmored.and.callFake(() => {
           const clone = cloneKey(unlocked)
@@ -225,6 +244,8 @@ describe('OpgpLiveKey', () => {
     })
 
     describe('when given an incorrect passphrase', () => {
+      let error: any
+      let result: any
       beforeEach((done) => {
         key.decrypt.and.returnValue(false)
 
@@ -247,6 +268,8 @@ describe('OpgpLiveKey', () => {
     })
 
     describe('when its {OpgpLiveKey} is already unlocked', () => {
+      let error: any
+      let result: any
       beforeEach((done) => {
         livekey = getLiveKey(unlocked)
 
@@ -268,8 +291,10 @@ describe('OpgpLiveKey', () => {
     })
 
     describe('when the openpgp primitive throws an exception', () => {
+      let error: any
+      let result: any
       beforeEach((done) => {
-        key.decrypt.and.throwError('boom');
+        key.decrypt.and.throwError('boom')
 
         livekey.unlock('passphrase')
         .then((res: any) => result = res)
@@ -291,8 +316,6 @@ describe('OpgpLiveKey', () => {
 
   describe('lock (passphrase: string, opts?: LiveKeyUnlockOpts): ' +
   'Promise<OpgpLiveKey>', () => {
-    let error: any
-    let result: any
     let unlocked: any
     beforeEach(() => {
       unlocked = cloneKey(key)
@@ -300,6 +323,8 @@ describe('OpgpLiveKey', () => {
     })
 
     describe('when given a passphrase', () => {
+      let error: any
+      let result: any
       beforeEach((done) => {
         unlocked.encrypt = jasmine.createSpy('encrypt')
         .and.callFake(() => unlocked.primaryKey.isDecrypted = false)
@@ -323,6 +348,8 @@ describe('OpgpLiveKey', () => {
     })
 
     describe('when its {OpgpLiveKey} is already locked', () => {
+      let error: any
+      let result: any
       beforeEach((done) => {
         livekey.lock('passphrase')
         .then((res: any) => result = res)
@@ -342,6 +369,8 @@ describe('OpgpLiveKey', () => {
     })
 
     describe('when the openpgp primitive throws an exception', () => {
+      let error: any
+      let result: any
       beforeEach((done) => {
         key.encrypt.and.throwError('boom');
         livekey = getLiveKey(unlocked)

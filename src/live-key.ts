@@ -153,7 +153,7 @@ class LiveKeyClass implements OpgpLiveKey {
   }
 
   armor (): Promise<string> {
-    return Promise.resolve(this.key.armor())
+    return Promise.try(() => this.key.armor())
   }
 
   unlock (passphrase: string, opts?: LiveKeyUnlockOpts): Promise<OpgpLiveKey> {
