@@ -13,6 +13,7 @@
  */
 ;
 import { OpgpKeyBlueprint, OpgpKeyId } from './proxy-key'
+import { isString } from './utils'
 const Buffer = require('buffer').Buffer // incorrect type definitions
 import Promise = require('bluebird')
 import { __assign as assign } from 'tslib'
@@ -401,10 +402,6 @@ function isLocked (key: any): boolean {
 function getExpiry (key: any): number {
 	const expires = key.getExpirationTime()
 	return expires ? expires.getTime() : Infinity
-}
-
-function isString (val: any): val is String {
-  return typeof (val && val.valueOf()) === 'string'
 }
 
 const getLiveKeyFactory: LiveKeyFactoryBuilder = LiveKeyClass.getFactory
