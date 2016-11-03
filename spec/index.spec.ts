@@ -96,21 +96,60 @@ describe('OpgpService', () => {
 
   describe('getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)' +
   ': Promise<OpgpProxyKey[]|OpgpProxyKey>', () => {
-    describe('when given a parsable PGP armored string of a single key', () => {
+    describe('when the underlying openpgp primitive returns a single key', () => {
       let error: any
       let result: any
-      let proxy: any
       beforeEach((done) => {
         service.getKeysFromArmor('key-armor')
-        .then((res: any) => proxy = res)
+        .then((res: any) => result = res)
         .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
       })
 
       it('returns a Promise that resolves to an {OpgpProxyKey} instance', () => {
-        expect(proxy).toEqual(jasmine.objectContaining({ handle: 'key-handle' }))
-        expect(proxy).toEqual(jasmine.objectContaining(livekey.bp))
+        expect(result).toEqual(jasmine.objectContaining({ handle: 'key-handle' }))
+        expect(result).toEqual(jasmine.objectContaining(livekey.bp))
         expect(error).not.toBeDefined()
+      })
+    })
+
+    describe('when the underlying openpgp primitive returns multiple keys', () => {
+      let error: any
+      let result: any
+      beforeEach((done) => {
+        openpgp.key.readArmored.and.returnValue({ keys: [ key, key, key ] })
+        service.getKeysFromArmor('keys-armor')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('returns a Promise that resolves to an {OpgpProxyKey} instance', () => {
+        expect(result).toEqual(jasmine.any(Array))
+        expect(result.length).toBe(3)
+        result.forEach((res: any) => {
+          expect(res).toEqual(jasmine.objectContaining({ handle: 'key-handle' }))
+          expect(res).toEqual(jasmine.objectContaining(livekey.bp))
+        })
+        expect(error).not.toBeDefined()
+      })
+    })
+
+    describe('when the underlying openpgp primitive throws an error', () => {
+      let error: any
+      let result: any
+      beforeEach((done) => {
+        openpgp.key.readArmored.and.throwError('boom')
+        service.getKeysFromArmor('key-armor')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('returns a Promise that resolves to an {OpgpProxyKey} instance', () => {
+        expect(error).toBeDefined()
+        expect(error.message).toBe('boom')
+        expect(result).not.toBeDefined()
       })
     })
   })
