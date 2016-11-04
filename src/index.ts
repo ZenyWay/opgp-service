@@ -47,7 +47,7 @@ export interface OpgpService {
    * @public
    * @method
    *
-   * @param {KeyProxyMap} proxies
+   * @param {KeyProxyMap} keyRefs
    * must include both private authentication keys
    * with which to sign the message,
    * and the public encryption keys.
@@ -60,12 +60,12 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  encrypt (proxies: ProxyKeyMap, plain: string, opts?: EncryptOpts): Promise<string>
+  encrypt (keyRefs: KeyRefMap, plain: string, opts?: EncryptOpts): Promise<string>
   /**
    * @public
    * @method
    *
-   * @param {KeyProxyMap} proxies
+   * @param {KeyProxyMap} keyRefs
    * must include both the private decryption key,
    * and public authentication keys
    * with which to verify the message signatures.
@@ -78,12 +78,12 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  decrypt (proxies: ProxyKeyMap, cipher: string, opts?: DecryptOpts): Promise<string>
+  decrypt (keyRefs: KeyRefMap, cipher: string, opts?: DecryptOpts): Promise<string>
   /**
    * @public
    * @method
    *
-   * @param {(OpgpProxyKey|string)[]} proxies of private authentication keys
+   * @param {(OpgpProxyKey|string)[]} keyRefs of private authentication keys
    * with which to sign the message.
    * @param {string} text
    * @param {SignOpts} [opts] ignored
@@ -94,12 +94,12 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  sign (proxy: (OpgpProxyKey|string)[], text: string, opts?: SignOpts): Promise<string>
+  sign (keyRefs: (OpgpProxyKey|string)[], text: string, opts?: SignOpts): Promise<string>
   /**
    * @public
    * @method
    *
-   * @param {(OpgpProxyKey|string)[]} proxies of public authentication keys
+   * @param {(OpgpProxyKey|string)[]} keyRefs of public authentication keys
    * with which to verify the message signatures.
    * @param {string} armor text
    * @param {SignOpts} [opts] ignored
@@ -110,10 +110,10 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  verify (proxy: (OpgpProxyKey|string)[], armor: string, opts?: VerifyOpts): Promise<string>
+  verify (keyRefs: (OpgpProxyKey|string)[], armor: string, opts?: VerifyOpts): Promise<string>
 }
 
-export interface ProxyKeyMap {
+export interface KeyRefMap {
   auth: (OpgpProxyKey|string)[]
   cipher: (OpgpProxyKey|string)[]
 }
@@ -163,25 +163,25 @@ class OpgpServiceClass implements OpgpService {
     })
   }
 
-  encrypt (proxies: ProxyKeyMap, plain: string, opts?: EncryptOpts): Promise<string> {
+  encrypt (keyRefs: KeyRefMap, plain: string, opts?: EncryptOpts): Promise<string> {
     return
   }
 
-  decrypt (proxies: ProxyKeyMap, cipher: string, opts?: DecryptOpts): Promise<string> {
+  decrypt (keyRefs: KeyRefMap, cipher: string, opts?: DecryptOpts): Promise<string> {
     return
   }
 
-  sign (proxy: (OpgpProxyKey|string)[], text: string, opts?: SignOpts): Promise<string> {
+  sign (keyRefs: (OpgpProxyKey|string)[], text: string, opts?: SignOpts): Promise<string> {
   	return Promise.try(() => {
       const message = this.openpgp.message.fromText(text)
-      const keys = [].concat(proxy)
-      .map(proxy => this.getCachedLiveKey(proxy))
+      const keys = [].concat(keyRefs)
+      .map(keyRef => this.getCachedLiveKey(keyRef))
 
       return message.sign(keys).armor()
     })
   }
 
-  verify (proxy: (OpgpProxyKey|string)[], armor: string, opts?: VerifyOpts): Promise<string> {
+  verify (keyRefs: (OpgpProxyKey|string)[], armor: string, opts?: VerifyOpts): Promise<string> {
     return
   }
 
@@ -196,7 +196,7 @@ class OpgpServiceClass implements OpgpService {
    * @private
    * @method
    *
-   * @param {(OpgpProxyKey|string)} proxy
+   * @param {(OpgpProxyKey|string)} keyRef
    * key proxy or handle from key proxy
    *
    * @returns {OpgpLiveKey}
@@ -206,8 +206,8 @@ class OpgpServiceClass implements OpgpService {
    *
    * @memberOf OpgpServiceClass
    */
-  getCachedLiveKey (proxy: OpgpProxyKey|string): OpgpLiveKey {
-    const handle: string = isString(proxy) ? proxy : proxy && proxy.handle
+  getCachedLiveKey (keyRef: OpgpProxyKey|string): OpgpLiveKey {
+    const handle: string = isString(keyRef) ? keyRef : keyRef && keyRef.handle
     const livekey = handle && this.cache.get(handle)
     if (!livekey) { throw new Error('invalid or stale key reference') }
     return livekey
