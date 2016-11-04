@@ -14,6 +14,7 @@
 ;
 import getLiveKeyFactory, { LiveKeyFactory, OpgpLiveKey } from './live-key'
 import getProxyKey, { ProxyKeyFactory, OpgpProxyKey } from './proxy-key'
+import { isString } from './utils'
 import getCache, { CsrKeyCache } from 'csrkey-cache'
 import * as Promise from 'bluebird'
 import { __assign as assign } from 'tslib'
@@ -171,7 +172,13 @@ class OpgpServiceClass implements OpgpService {
   }
 
   sign (proxy: (OpgpProxyKey|string)[], text: string, opts?: SignOpts): Promise<string> {
-    return
+  	return Promise.try(() => {
+      const message = this.openpgp.message.fromText(text)
+      const keys = [].concat(proxy)
+      .map(proxy => this.getCachedLiveKey(proxy))
+
+      return message.sign(keys).armor()
+    })
   }
 
   verify (proxy: (OpgpProxyKey|string)[], armor: string, opts?: VerifyOpts): Promise<string> {
@@ -184,6 +191,27 @@ class OpgpServiceClass implements OpgpService {
     private getProxyKey: ProxyKeyFactory,
     private openpgp: any
   ) {}
+
+  /**
+   * @private
+   * @method
+   *
+   * @param {(OpgpProxyKey|string)} proxy
+   * key proxy or handle from key proxy
+   *
+   * @returns {OpgpLiveKey}
+   * from cache when proxy/handle is valid and not stale
+   *
+   * @error {Error} 'invalid or stale key reference'
+   *
+   * @memberOf OpgpServiceClass
+   */
+  getCachedLiveKey (proxy: OpgpProxyKey|string): OpgpLiveKey {
+    const handle: string = isString(proxy) ? proxy : proxy && proxy.handle
+    const livekey = handle && this.cache.get(handle)
+    if (!livekey) { throw new Error('invalid or stale key reference') }
+    return livekey
+  }
 }
 
 function getOpenpgp (config: any): any {

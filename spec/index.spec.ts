@@ -153,4 +153,38 @@ describe('OpgpService', () => {
       })
     })
   })
+
+  describe('sign (proxy: (OpgpProxyKey|string)[], text: string, opts?: SignOpts)' +
+  ': Promise<string>', () => {
+    let message: any
+    beforeEach(() => {
+      message = jasmine.createSpyObj('message', [ 'sign', 'verify', 'armor' ])
+    })
+
+    describe('when given text string and a valid handle string that is not stale',
+    () => {
+      let error: any
+      let result: any
+      beforeEach((done) => {
+        cache.get.and.returnValue(livekey)
+        openpgp.message.fromText.and.returnValue(message)
+        message.sign.and.returnValue(message)
+        message.armor.and.returnValue('signed-text')
+        service.sign('valid-key-handle', 'plain text')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('returns a Promise that resolves to the given text string ' +
+      'signed with the referenced {OpgpLiveKey} instance', () => {
+        expect(openpgp.message.fromText).toHaveBeenCalledWith('plain text')
+        expect(cache.get).toHaveBeenCalledWith('valid-key-handle')
+        expect(message.sign).toHaveBeenCalledWith([ livekey ])
+        expect(message.armor).toHaveBeenCalledWith()
+        expect(result).toBe('signed-text')
+        expect(error).not.toBeDefined()
+      })
+    })
+  })
 })
