@@ -106,7 +106,8 @@ export interface OpgpService {
    *
    * @returns {Promise<string>} verified plain text.
    *
-   * @error {Error} when verification fails
+   * @error {Error} when verification fails.
+   * tail of error message lists all IDs of keys for which authentication fails.
    *
    * @memberOf OpgpService
    */
@@ -184,7 +185,24 @@ class OpgpServiceClass implements OpgpService {
   }
 
   verify (keyRefs: (OpgpProxyKey|string)[], armor: string, opts?: VerifyOpts): Promise<string> {
-    return
+  	return Promise.try(() => {
+      const keys = [].concat(keyRefs)
+      .map(keyRef => this.getCachedLiveKey(keyRef))
+
+      if (!isString(armor)) { return Promise.reject(new Error('invalid armor: not a string')) }
+      const message = this.openpgp.message.readArmored(armor)
+
+      /**
+       * comma-separated list of IDs of keys for which authenticaion fails
+       */
+      const invalid = message.verify(keys)
+      .filter((key: any) => !key.valid)
+      .map((key: any) => key.keyid)
+      .join()
+
+      return !invalid ? message.getText()
+      : Promise.reject(new Error('authentication failed: ' + invalid))
+    })
   }
 
   constructor (
@@ -209,7 +227,7 @@ class OpgpServiceClass implements OpgpService {
    * @memberOf OpgpServiceClass
    */
   getCachedLiveKey (keyRef: OpgpProxyKey|string): OpgpLiveKey {
-    const handle: string = isString(keyRef) ? keyRef : keyRef && keyRef.handle
+    const handle = isString(keyRef) ? keyRef : !!keyRef && keyRef.handle
     const livekey = isString(handle) && this.cache.get(handle)
     if (!livekey) { throw new Error('invalid key reference: not a string or stale') }
     return livekey

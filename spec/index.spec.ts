@@ -169,14 +169,14 @@ describe('OpgpService', () => {
     })
   })
 
-  describe('sign (proxy: (OpgpProxyKey|string)[], text: string, opts?: SignOpts)' +
+  describe('sign (keyRefs: (OpgpProxyKey|string)[], text: string, opts?: SignOpts)' +
   ': Promise<string>', () => {
     let message: any
     beforeEach(() => {
       message = jasmine.createSpyObj('message', [ 'sign', 'verify', 'armor' ])
     })
 
-    describe('when given text string and a valid handle string that is not stale',
+    describe('when given a text string and a valid handle string that is not stale',
     () => {
       let error: any
       let result: any
@@ -191,18 +191,24 @@ describe('OpgpService', () => {
         .finally(() => setTimeout(done))
       })
 
-      it('returns a Promise that resolves to the given text string ' +
-      'signed with the referenced {OpgpLiveKey} instance', () => {
-        expect(openpgp.message.fromText).toHaveBeenCalledWith('plain text')
+      it('retrieves the livekey referenced by the given handle', () => {
         expect(cache.get).toHaveBeenCalledWith('valid-key-handle')
+      })
+
+      it('delegates to the openpgp primitive', () => {
+        expect(openpgp.message.fromText).toHaveBeenCalledWith('plain text')
         expect(message.sign).toHaveBeenCalledWith([ livekey ])
         expect(message.armor).toHaveBeenCalledWith()
+      })
+
+      it('returns a Promise that resolves to the given text string ' +
+      'signed with the referenced {OpgpLiveKey} instance', () => {
         expect(result).toBe('signed-text')
         expect(error).not.toBeDefined()
       })
     })
 
-    describe('when given text string and a stale handle string',
+    describe('when given a text string and a stale handle string',
     () => {
       let error: any
       let result: any
@@ -214,10 +220,16 @@ describe('OpgpService', () => {
         .finally(() => setTimeout(done))
       })
 
+      it('attempts to retrieve the livekey referenced by the given handle', () => {
+        expect(cache.get).toHaveBeenCalledWith('stale-key-handle')
+      })
+
+      it('does not delegate to the openpgp primitive', () => {
+        expect(openpgp.message.fromText).not.toHaveBeenCalled()
+      })
+
       it('returns a Promise that rejects ' +
       'with an `invalid key reference: not a string or stale` {Error}', () => {
-        expect(openpgp.message.fromText).not.toHaveBeenCalled()
-        expect(cache.get).toHaveBeenCalledWith('stale-key-handle')
         expect(result).not.toBeDefined()
         expect(error).toBeDefined()
         expect(error.message).toBe('invalid key reference: not a string or stale')
@@ -250,12 +262,18 @@ describe('OpgpService', () => {
         .finally(() => setTimeout(done))
       })
 
+      it('attempts to retrieve the livekeys referenced by the given handles', () => {
+        cache.get.calls.allArgs()
+        .forEach((args: any) => expect(args).toEqual([ 'valid handle' ]))
+      })
+
+      it('does not delegate to the openpgp primitive', () => {
+        expect(openpgp.message.fromText).not.toHaveBeenCalled()
+      })
+
       it('returns a Promise that rejects ' +
       'with an `invalid key reference: not a string or stale` or ' +
       'an `invalid text: not a string` {Error}', () => {
-        expect(openpgp.message.fromText).not.toHaveBeenCalled()
-        cache.get.calls.allArgs()
-        .forEach((args: any) => expect(args).toEqual([ 'valid handle' ]))
         expect(result).not.toBeDefined()
         expect(error).toEqual(jasmine.any(Promise.AggregateError))
         error.forEach((error: any) => {
@@ -263,6 +281,45 @@ describe('OpgpService', () => {
           expect(error.message).toEqual(jasmine
           .stringMatching(/invalid key reference: not a string or stale|invalid text: not a string/))
         })
+      })
+    })
+  })
+
+  describe('verify (keyRefs: (OpgpProxyKey|string)[], armor: string, opts?: VerifyOpts)' +
+  ': Promise<string>', () => {
+    let message: any
+    beforeEach(() => {
+      message = jasmine.createSpyObj('message', [ 'sign', 'verify', 'getText' ])
+    })
+
+    describe('when given a signed armor text string and the valid handle string ' +
+    'of the corresponding authentication key', () => {
+      let error: any
+      let result: any
+      beforeEach((done) => {
+        cache.get.and.returnValue(livekey)
+        openpgp.message.readArmored.and.returnValue(message)
+        message.verify.and.returnValue([ { keyid: 'keyid', valid: true }])
+        message.getText.and.returnValue('plain-text')
+        service.verify('valid-auth-key-handle', 'signed armor text')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the livekey referenced by the given handle', () => {
+        expect(cache.get).toHaveBeenCalledWith('valid-auth-key-handle')
+      })
+
+      it('delegates to the openpgp primitive', () => {
+        expect(openpgp.message.readArmored).toHaveBeenCalledWith('signed armor text')
+        expect(message.verify).toHaveBeenCalledWith([ livekey ])
+        expect(message.getText).toHaveBeenCalledWith()
+      })
+
+      it('returns a Promise that resolves to the plain text string', () => {
+        expect(result).toBe('plain-text')
+        expect(error).not.toBeDefined()
       })
     })
   })
