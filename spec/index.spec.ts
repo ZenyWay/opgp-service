@@ -13,6 +13,7 @@
  */
 ;
 import getService from '../src'
+import * as Promise from 'bluebird'
 
 let opgpService: any
 let cache: any
@@ -21,6 +22,7 @@ let getProxyKey: any
 let openpgp: any
 let key: any
 let livekey: any
+let types: any
 
 beforeEach(() => { // mock dependencies
   cache = jasmine.createSpyObj('cache', [ 'set', 'del', 'get', 'has' ])
@@ -43,6 +45,19 @@ beforeEach(() => { // mock dependencies
     sign: jasmine.any(Function),
     verify: jasmine.any(Function)
   })
+})
+
+beforeEach(() => {
+  types = [
+    undefined,
+    null,
+    NaN,
+    true,
+    42,
+    'foo',
+    [ 'foo' ],
+    { foo: 'foo' }
+  ]
 })
 
 describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' +
@@ -184,6 +199,70 @@ describe('OpgpService', () => {
         expect(message.armor).toHaveBeenCalledWith()
         expect(result).toBe('signed-text')
         expect(error).not.toBeDefined()
+      })
+    })
+
+    describe('when given text string and a stale handle string',
+    () => {
+      let error: any
+      let result: any
+      beforeEach((done) => {
+        cache.get.and.returnValue(undefined)
+        service.sign('stale-key-handle', 'plain text')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('returns a Promise that rejects ' +
+      'with an `invalid key reference: not a string or stale` {Error}', () => {
+        expect(openpgp.message.fromText).not.toHaveBeenCalled()
+        expect(cache.get).toHaveBeenCalledWith('stale-key-handle')
+        expect(result).not.toBeDefined()
+        expect(error).toBeDefined()
+        expect(error.message).toBe('invalid key reference: not a string or stale')
+      })
+    })
+
+    describe('when given non-compliant arguments', () => {
+      let error: any
+      let result: any
+      beforeEach((done) => {
+        function isString (val: any): val is String {
+          return typeof val === 'string'
+        }
+        const nonStringTypes = types
+        .filter((val: any) => !isString(val))
+
+        const args = nonStringTypes
+        .filter((val: any) => !Array.isArray(val))
+        .map((invalidKeyRef: any) => [ invalidKeyRef, 'valid text' ])
+        .concat(nonStringTypes
+          .map((invalidKeyRef: any) => [ [ invalidKeyRef ], 'valid text' ]))
+        .concat(nonStringTypes
+          .map((invalidText: any) => [ 'valid handle', invalidText ]))
+
+        cache.get.and.returnValue(livekey)
+
+        Promise.any(args.map((args: any[]) => service.sign.apply(service, args)))
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('returns a Promise that rejects ' +
+      'with an `invalid key reference: not a string or stale` or ' +
+      'an `invalid text: not a string` {Error}', () => {
+        expect(openpgp.message.fromText).not.toHaveBeenCalled()
+        cache.get.calls.allArgs()
+        .forEach((args: any) => expect(args).toEqual([ 'valid handle' ]))
+        expect(result).not.toBeDefined()
+        expect(error).toEqual(jasmine.any(Promise.AggregateError))
+        error.forEach((error: any) => {
+          expect(error).toEqual(jasmine.any(Error))
+          expect(error.message).toEqual(jasmine
+          .stringMatching(/invalid key reference: not a string or stale|invalid text: not a string/))
+        })
       })
     })
   })

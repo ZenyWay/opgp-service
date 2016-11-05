@@ -173,9 +173,11 @@ class OpgpServiceClass implements OpgpService {
 
   sign (keyRefs: (OpgpProxyKey|string)[], text: string, opts?: SignOpts): Promise<string> {
   	return Promise.try(() => {
-      const message = this.openpgp.message.fromText(text)
       const keys = [].concat(keyRefs)
       .map(keyRef => this.getCachedLiveKey(keyRef))
+
+      if (!isString(text)) { return Promise.reject(new Error('invalid text: not a string')) }
+      const message = this.openpgp.message.fromText(text)
 
       return message.sign(keys).armor()
     })
@@ -208,8 +210,8 @@ class OpgpServiceClass implements OpgpService {
    */
   getCachedLiveKey (keyRef: OpgpProxyKey|string): OpgpLiveKey {
     const handle: string = isString(keyRef) ? keyRef : keyRef && keyRef.handle
-    const livekey = handle && this.cache.get(handle)
-    if (!livekey) { throw new Error('invalid or stale key reference') }
+    const livekey = isString(handle) && this.cache.get(handle)
+    if (!livekey) { throw new Error('invalid key reference: not a string or stale') }
     return livekey
   }
 }
