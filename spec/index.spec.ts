@@ -421,6 +421,53 @@ describe('OpgpService', () => {
       })
     })
 
+    describe('when given a signed armor text string and a valid handle string ' +
+    'of the wrong authentication key', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(livekey)
+        openpgp.message.readArmored.and.returnValue(message)
+        message.verify.and.returnValue([
+          { keyid: 'verified-keyid', valid: true },
+          { keyid: 'wrong-keyid', valid: false },
+          { keyid: 'another-wrong-keyid', valid: false }
+        ])
+      })
+
+      beforeEach((done) => {
+        service.verify([
+          'correct-key-handle', 'wrong-key-handle', 'another-wrong-key-handle'
+        ], 'signed armor text')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instance referenced by the given handle',
+      () => {
+        expect(cache.get.calls.allArgs()).toEqual([
+          [ 'correct-key-handle' ],
+          [ 'wrong-key-handle' ],
+          [ 'another-wrong-key-handle' ]
+        ])
+      })
+
+      it('delegates to the openpgp primitive', () => {
+        expect(openpgp.message.readArmored).toHaveBeenCalledWith('signed armor text')
+        expect(message.verify).toHaveBeenCalledWith([ livekey, livekey, livekey ])
+        expect(message.getText).not.toHaveBeenCalled()
+      })
+
+      it('returns a Promise that rejects with an {Error} containing a message ' +
+      'with a trailing list of the key IDs that fail authentication', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toEqual(jasmine.any(Error))
+        expect(error.message)
+        .toBe('authentication failed: wrong-keyid,another-wrong-keyid')
+      })
+    })
+
     describe('when given a signed armor text string and a stale handle string',
     () => {
       let error: any
