@@ -65,10 +65,13 @@ export interface OpgpService {
    * @param {string} passphrase for unlocking referenced key.
    * @param {UnlockOpts=} opts ignored
    *
-   * @returns {Promise<OpgpProxyKey>}
-   * * a new {OpgpProxyKey} instance, unlocked
-   * * or the referenced {OpgpProxyKey} instance when it is already unlocked,
-   * or when unlocking fails.
+   * @returns {Promise<OpgpProxyKey>} new unlocked instance
+   *
+   * @error {Error} 'key not locked'
+   *
+   * @error {Error} 'fail to unlock key'
+   *
+   * @error {Error} from the openpgp decrypt primitive
    *
    * @memberOf OpgpService
    */
@@ -90,11 +93,15 @@ export interface OpgpService {
    * @param {string} passphrase
    * @param {LockOpts} [opts]
    *
-   * @returns {Promise<OpgpProxyKey>}
+   * @returns {Promise<OpgpProxyKey>} new locked instance
    *
-   * @error {Error} when key encryption fails.
-   * the referenced {OpgpProxyKey} key is in an undefined state
-   * and should be discarded!
+   * @error {Error} 'key not unlocked'
+   * the referenced {OpgpProxyKey} and its corresponding {OpgpLiveKey}
+   * are not mutated.
+   *
+   * @error {Error} from the openpgp key primitive
+   * the referenced {OpgpProxyKey} and its corresponding {OpgpLiveKey}
+   * are in an undefined state and should be discarded!
    *
    * @memberOf OpgpService
    */
