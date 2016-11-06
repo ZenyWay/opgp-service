@@ -47,19 +47,6 @@ beforeEach(() => { // mock dependencies
   })
 })
 
-beforeEach(() => {
-  types = [
-    undefined,
-    null,
-    NaN,
-    true,
-    42,
-    'foo',
-    [ 'foo' ],
-    { foo: 'foo' }
-  ]
-})
-
 describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' +
 'OpgpService', () => {
 
@@ -131,8 +118,11 @@ describe('OpgpService', () => {
     describe('when the underlying openpgp primitive returns multiple keys', () => {
       let error: any
       let result: any
-      beforeEach((done) => {
+      beforeEach(() => {
         openpgp.key.readArmored.and.returnValue({ keys: [ key, key, key ] })
+      })
+
+      beforeEach((done) => {
         service.getKeysFromArmor('keys-armor')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
@@ -153,8 +143,11 @@ describe('OpgpService', () => {
     describe('when the underlying openpgp primitive throws an error', () => {
       let error: any
       let result: any
-      beforeEach((done) => {
+      beforeEach(() => {
         openpgp.key.readArmored.and.throwError('boom')
+      })
+
+      beforeEach((done) => {
         service.getKeysFromArmor('key-armor')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
@@ -180,11 +173,14 @@ describe('OpgpService', () => {
     () => {
       let error: any
       let result: any
-      beforeEach((done) => {
+      beforeEach(() => {
         cache.get.and.returnValue(livekey)
         openpgp.message.fromText.and.returnValue(message)
         message.sign.and.returnValue(message)
         message.armor.and.returnValue('signed-text')
+      })
+
+      beforeEach((done) => {
         service.sign('valid-key-handle', 'plain text')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
@@ -212,8 +208,11 @@ describe('OpgpService', () => {
     () => {
       let error: any
       let result: any
-      beforeEach((done) => {
+      beforeEach(() => {
         cache.get.and.returnValue(undefined)
+      })
+
+      beforeEach((done) => {
         service.sign('stale-key-handle', 'plain text')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
@@ -239,23 +238,12 @@ describe('OpgpService', () => {
     describe('when given non-compliant arguments', () => {
       let error: any
       let result: any
-      beforeEach((done) => {
-        function isString (val: any): val is String {
-          return typeof val === 'string'
-        }
-        const nonStringTypes = types
-        .filter((val: any) => !isString(val))
-
-        const args = nonStringTypes
-        .filter((val: any) => !Array.isArray(val))
-        .map((invalidKeyRef: any) => [ invalidKeyRef, 'valid text' ])
-        .concat(nonStringTypes
-          .map((invalidKeyRef: any) => [ [ invalidKeyRef ], 'valid text' ]))
-        .concat(nonStringTypes
-          .map((invalidText: any) => [ 'valid handle', invalidText ]))
-
+      beforeEach(() => {
         cache.get.and.returnValue(livekey)
+      })
 
+      beforeEach((done) => {
+        const args = getInvalidAuthArgs()
         Promise.any(args.map((args: any[]) => service.sign.apply(service, args)))
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
@@ -296,11 +284,14 @@ describe('OpgpService', () => {
     'of the corresponding authentication key', () => {
       let error: any
       let result: any
-      beforeEach((done) => {
+      beforeEach(() => {
         cache.get.and.returnValue(livekey)
         openpgp.message.readArmored.and.returnValue(message)
         message.verify.and.returnValue([ { keyid: 'keyid', valid: true }])
         message.getText.and.returnValue('plain-text')
+      })
+
+      beforeEach((done) => {
         service.verify('valid-auth-key-handle', 'signed armor text')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
@@ -322,5 +313,101 @@ describe('OpgpService', () => {
         expect(error).not.toBeDefined()
       })
     })
+
+    describe('when given a signed armor text string and a stale handle string',
+    () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(undefined)
+      })
+
+      beforeEach((done) => {
+        service.verify('stale-key-handle', 'signed armor text')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('attempts to retrieve the livekey referenced by the given handle', () => {
+        expect(cache.get).toHaveBeenCalledWith('stale-key-handle')
+      })
+
+      it('does not delegate to the openpgp primitive', () => {
+        expect(openpgp.message.readArmored).not.toHaveBeenCalled()
+      })
+
+      it('returns a Promise that rejects ' +
+      'with an `invalid key reference: not a string or stale` {Error}', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toBeDefined()
+        expect(error.message).toBe('invalid key reference: not a string or stale')
+      })
+    })
+
+    describe('when given non-compliant arguments', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(livekey)
+      })
+
+      beforeEach((done) => {
+        const args = getInvalidAuthArgs()
+        Promise.any(args.map((args: any[]) => service.verify.apply(service, args)))
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('attempts to retrieve the livekeys referenced by the given handles', () => {
+        cache.get.calls.allArgs()
+        .forEach((args: any) => expect(args).toEqual([ 'valid handle' ]))
+      })
+
+      it('does not delegate to the openpgp primitive', () => {
+        expect(openpgp.message.readArmored).not.toHaveBeenCalled()
+      })
+
+      it('returns a Promise that rejects ' +
+      'with an `invalid key reference: not a string or stale` or ' +
+      'an `invalid armor: not a string` {Error}', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toEqual(jasmine.any(Promise.AggregateError))
+        error.forEach((error: any) => {
+          expect(error).toEqual(jasmine.any(Error))
+          expect(error.message).toEqual(jasmine
+          .stringMatching(/invalid key reference: not a string or stale|invalid armor: not a string/))
+        })
+      })
+    })
   })
 })
+
+function getInvalidAuthArgs () {
+  const types = [
+    undefined,
+    null,
+    NaN,
+    true,
+    42,
+    'foo',
+    [ 'foo' ],
+    { foo: 'foo' }
+  ]
+
+  function isString (val: any): val is String {
+    return typeof val === 'string'
+  }
+
+  const nonStringTypes = types
+  .filter((val: any) => !isString(val))
+
+  return nonStringTypes
+  .filter((val: any) => !Array.isArray(val))
+  .map((invalidKeyRef: any) => [ invalidKeyRef, 'valid text' ])
+  .concat(nonStringTypes
+    .map((invalidKeyRef: any) => [ [ invalidKeyRef ], 'valid text' ]))
+  .concat(nonStringTypes
+    .map((invalidText: any) => [ 'valid handle', invalidText ]))
+}
