@@ -170,7 +170,7 @@ export interface OpgpService {
   verify (keyRefs: KeyRef[]|KeyRef, armor: string, opts?: VerifyOpts): Promise<string>
 }
 
-type KeyRef = OpgpProxyKey|string
+export type KeyRef = OpgpProxyKey|string
 
 export interface KeyRefMap {
   auth: KeyRef[]|KeyRef
@@ -195,7 +195,7 @@ export interface OpgpKeyOpts {
   users: UserId[]|UserId
 }
 
-type UserId = UserIdSpec|string
+export type UserId = UserIdSpec|string
 
 export interface UserIdSpec {
   name?: string
