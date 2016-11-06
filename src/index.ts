@@ -262,17 +262,8 @@ class OpgpServiceClass implements OpgpService {
   }
 
   unlock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts): Promise<OpgpProxyKey> {
-    return Promise.try(() => {
-      const livekey = this.getCachedLiveKey(keyRef)
-      if (!livekey.bp.isLocked) {
-        const handle = <string>getHandle(keyRef) // must be valid because required for fetching livekey
-        return getProxyKey(handle, livekey.bp)
-      }
-
-      return livekey.unlock(passphrase)
-      .then(unlocked => !unlocked.bp.isLocked ? this.cacheAndProxyKey(unlocked)
-      : Promise.reject(new Error('fail to unlock key')))
-    })
+    return Promise.try(() => this.getCachedLiveKey(keyRef).unlock(passphrase))
+    .then(unlocked => this.cacheAndProxyKey(unlocked))
   }
 
   lock (keyRef: KeyRef, passphrase: string, opts?: LockOpts): Promise<OpgpProxyKey> {

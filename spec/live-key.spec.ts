@@ -255,10 +255,11 @@ describe('OpgpLiveKey', () => {
         .finally(() => setTimeout(done))
       })
 
-      it('returns a Promise that resolves to its {OpgpLiveKey} instance',
+      it('returns a Promise that rejects with a `fail to unlock key` {Error}',
       () => {
-        expect(error).not.toBeDefined()
-        expect(result).toBe(livekey)
+        expect(result).not.toBeDefined()
+        expect(error).toEqual(jasmine.any(Error))
+        expect(error.message).toBe('fail to unlock key')
       })
       it('does not change the state of its {OpgpLiveKey} instance', () => {
         expect(livekey.key).toBe(key)
@@ -279,9 +280,10 @@ describe('OpgpLiveKey', () => {
         .finally(() => setTimeout(done))
       })
 
-      it('returns a Promise that resolves to its {OpgpLiveKey} instance', () => {
-        expect(error).not.toBeDefined()
-        expect(result).toBe(livekey)
+      it('returns a Promise that rejects with a `key not locked` {Error}', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toEqual(jasmine.any(Error))
+        expect(error.message).toBe('key not locked')
       })
       it('does not change the state of its {OpgpLiveKey} instance', () => {
         expect(livekey.key).toBe(unlocked)
@@ -303,6 +305,7 @@ describe('OpgpLiveKey', () => {
       })
 
       it('returns a Promise that rejects with the corresponding error', () => {
+        expect(result).not.toBeDefined()
         expect(error).toEqual(jasmine.any(Error))
         expect(error.message).toBe('boom')
       })
@@ -357,9 +360,10 @@ describe('OpgpLiveKey', () => {
         .finally(() => setTimeout(done))
       })
 
-      it('returns a Promise that resolves to its {OpgpLiveKey} instance', () => {
-        expect(error).not.toBeDefined()
-        expect(result).toBe(livekey)
+      it('returns a Promise that rejects with a `key not unlocked` {Error}', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toEqual(jasmine.any(Error))
+        expect(error.message).toBe('key not unlocked')
       })
       it('does not change the state of its {OpgpLiveKey} instance', () => {
         expect(livekey.key).toBe(key)
@@ -382,6 +386,7 @@ describe('OpgpLiveKey', () => {
       })
 
       it('returns a Promise that rejects with the corresponding error', () => {
+        expect(result).not.toBeDefined()
         expect(error).toEqual(jasmine.any(Error))
         expect(error.message).toBe('boom')
       })
