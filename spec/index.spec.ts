@@ -162,7 +162,7 @@ describe('OpgpService', () => {
     })
   })
 
-  describe('sign (keyRefs: (OpgpProxyKey|string)[], text: string, opts?: SignOpts)' +
+  describe('sign (keyRefs: KeyRef[]|KeyRef, text: string, opts?: SignOpts)' +
   ': Promise<string>', () => {
     let message: any
     beforeEach(() => {
@@ -273,7 +273,7 @@ describe('OpgpService', () => {
     })
   })
 
-  describe('verify (keyRefs: (OpgpProxyKey|string)[], armor: string, opts?: VerifyOpts)' +
+  describe('verify (keyRefs: KeyRef[]|KeyRef, armor: string, opts?: VerifyOpts)' +
   ': Promise<string>', () => {
     let message: any
     beforeEach(() => {

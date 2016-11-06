@@ -61,7 +61,7 @@ export interface OpgpService {
    * @public
    * @method
    *
-   * @param {OpgpProxyKey|string} keyRef reference of key to unlock.
+   * @param {KeyRef} keyRef reference of key to unlock.
    * @param {string} passphrase for unlocking referenced key.
    * @param {UnlockOpts=} opts ignored
    *
@@ -72,7 +72,7 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  unlock (keyRef: OpgpProxyKey|string, passphrase: string, opts?: UnlockOpts): Promise<OpgpProxyKey>
+  unlock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts): Promise<OpgpProxyKey>
   /**
    * @public
    * @method
@@ -85,7 +85,7 @@ export interface OpgpService {
    * subsequent calls to any {OpgpService} methods with this instance
    * will consistently be rejected.
    *
-   * @param {OpgpProxyKey|string} keyRef reference of key to unlock.
+   * @param {KeyRef} keyRef reference of key to unlock.
    * always discard this {OpgpProxyKey} instance after calling this method.
    * @param {string} passphrase
    * @param {LockOpts} [opts]
@@ -98,7 +98,7 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  lock (keyRef: OpgpProxyKey|string, passphrase: string, opts?: LockOpts): Promise<OpgpProxyKey>
+  lock (keyRef: KeyRef, passphrase: string, opts?: LockOpts): Promise<OpgpProxyKey>
   /**
    * @public
    * @method
@@ -139,7 +139,7 @@ export interface OpgpService {
    * @public
    * @method
    *
-   * @param {(OpgpProxyKey|string)[]} keyRefs of private authentication keys
+   * @param {KeyRef[]|KeyRef} keyRefs of private authentication keys
    * with which to sign the message.
    * @param {string} text
    * @param {SignOpts} [opts] ignored
@@ -150,12 +150,12 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  sign (keyRefs: (OpgpProxyKey|string)[], text: string, opts?: SignOpts): Promise<string>
+  sign (keyRefs: KeyRef[]|KeyRef, text: string, opts?: SignOpts): Promise<string>
   /**
    * @public
    * @method
    *
-   * @param {(OpgpProxyKey|string)[]} keyRefs of public authentication keys
+   * @param {KeyRef[]|KeyRef} keyRefs of public authentication keys
    * with which to verify the message signatures.
    * @param {string} armor text
    * @param {SignOpts} [opts] ignored
@@ -167,12 +167,14 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  verify (keyRefs: (OpgpProxyKey|string)[], armor: string, opts?: VerifyOpts): Promise<string>
+  verify (keyRefs: KeyRef[]|KeyRef, armor: string, opts?: VerifyOpts): Promise<string>
 }
 
+type KeyRef = OpgpProxyKey|string
+
 export interface KeyRefMap {
-  auth: (OpgpProxyKey|string)[]
-  cipher: (OpgpProxyKey|string)[]
+  auth: KeyRef[]|KeyRef
+  cipher: KeyRef[]|KeyRef
 }
 
 export interface OpgpKeyOpts {
@@ -249,11 +251,11 @@ class OpgpServiceClass implements OpgpService {
     })
   }
 
-  unlock (keyRef: OpgpProxyKey|string, passphrase: string, opts?: UnlockOpts): Promise<OpgpProxyKey> {
+  unlock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts): Promise<OpgpProxyKey> {
     return
   }
 
-  lock (keyRef: OpgpProxyKey|string, passphrase: string, opts?: LockOpts): Promise<OpgpProxyKey> {
+  lock (keyRef: KeyRef, passphrase: string, opts?: LockOpts): Promise<OpgpProxyKey> {
     return
   }
 
@@ -265,7 +267,7 @@ class OpgpServiceClass implements OpgpService {
     return
   }
 
-  sign (keyRefs: (OpgpProxyKey|string)[], text: string, opts?: SignOpts): Promise<string> {
+  sign (keyRefs: KeyRef[]|KeyRef, text: string, opts?: SignOpts): Promise<string> {
   	return Promise.try(() => {
       const keys = [].concat(keyRefs)
       .map(keyRef => this.getCachedLiveKey(keyRef))
@@ -277,7 +279,7 @@ class OpgpServiceClass implements OpgpService {
     })
   }
 
-  verify (keyRefs: (OpgpProxyKey|string)[], armor: string, opts?: VerifyOpts): Promise<string> {
+  verify (keyRefs: KeyRef[]|KeyRef, armor: string, opts?: VerifyOpts): Promise<string> {
   	return Promise.try(() => {
       const keys = [].concat(keyRefs)
       .map(keyRef => this.getCachedLiveKey(keyRef))
@@ -309,7 +311,7 @@ class OpgpServiceClass implements OpgpService {
    * @private
    * @method
    *
-   * @param {(OpgpProxyKey|string)} keyRef
+   * @param {KeyRef} keyRef
    * key proxy or handle from key proxy
    *
    * @returns {OpgpLiveKey}
@@ -319,7 +321,7 @@ class OpgpServiceClass implements OpgpService {
    *
    * @memberOf OpgpServiceClass
    */
-  getCachedLiveKey (keyRef: OpgpProxyKey|string): OpgpLiveKey {
+  getCachedLiveKey (keyRef: KeyRef): OpgpLiveKey {
     const handle = isString(keyRef) ? keyRef : !!keyRef && keyRef.handle
     const livekey = isString(handle) && this.cache.get(handle)
     if (!livekey) { throw new Error('invalid key reference: not a string or stale') }
