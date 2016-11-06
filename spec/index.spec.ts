@@ -15,12 +15,10 @@
 import getService from '../src'
 import * as Promise from 'bluebird'
 
-let opgpService: any
 let cache: any
 let getLiveKey: any
 let getProxyKey: any
 let openpgp: any
-let key: any
 let livekey: any
 let types: any
 
@@ -30,25 +28,24 @@ beforeEach(() => { // mock dependencies
   getProxyKey = jasmine.createSpy('getProxyKey')
   openpgp = {
     crypto: { hash: jasmine.createSpyObj('hash', [ 'sha256' ]) },
-    key: jasmine.createSpyObj('key', [ 'readArmored' ]),
+    key: jasmine.createSpyObj('key', [ 'readArmored', 'generateKey' ]),
     message: jasmine.createSpyObj('message', [ 'fromText', 'readArmored' ])
   }
-  cache.set.and.returnValue('key-handle')
-  key = {}
   livekey = { key: {}, bp: { keys: [ { id: 'key-id' } ], user: { ids: [] } } }
-  openpgp.key.readArmored.and.returnValue({ keys: [ key ] })
-  getLiveKey.and.returnValue(livekey)
-  opgpService = jasmine.objectContaining({
-    getKeysFromArmor: jasmine.any(Function),
-    encrypt: jasmine.any(Function),
-    decrypt: jasmine.any(Function),
-    sign: jasmine.any(Function),
-    verify: jasmine.any(Function)
-  })
 })
 
 describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' +
 'OpgpService', () => {
+  let opgpService: any
+  beforeEach(() => {
+    opgpService = jasmine.objectContaining({
+      getKeysFromArmor: jasmine.any(Function),
+      encrypt: jasmine.any(Function),
+      decrypt: jasmine.any(Function),
+      sign: jasmine.any(Function),
+      verify: jasmine.any(Function)
+    })
+  })
 
   describe('when called without arguments', () => {
     let service: any
@@ -66,6 +63,12 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
   'openpgp?: openpgp }', () => {
     let service: any
     beforeEach(() => {
+      openpgp.key.readArmored.and.returnValue({ keys: [ livekey.key ] })
+      getLiveKey.and.returnValue(livekey)
+      cache.set.and.returnValue('key-handle')
+    })
+
+    beforeEach(() => {
       service = getService({
         cache: cache,
         getLiveKey: getLiveKey,
@@ -78,7 +81,7 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
     it('returns an {OpgpService} instance based on the given dependencies ', () =>{
       expect(service).toEqual(opgpService)
       expect(openpgp.key.readArmored).toHaveBeenCalledWith('key-armor')
-      expect(getLiveKey).toHaveBeenCalledWith(key)
+      expect(getLiveKey).toHaveBeenCalledWith(livekey.key)
       expect(cache.set).toHaveBeenCalledWith(livekey)
       expect(getProxyKey).toHaveBeenCalledWith('key-handle', livekey.bp)
     })
@@ -98,9 +101,21 @@ describe('OpgpService', () => {
 
   describe('getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)' +
   ': Promise<OpgpProxyKey[]|OpgpProxyKey>', () => {
+
+    it('delegates to the openpgp primitive', () => {
+      service.getKeysFromArmor('key-armor')
+      expect(openpgp.key.readArmored).toHaveBeenCalledWith('key-armor')
+    })
+
     describe('when the underlying openpgp primitive returns a single key', () => {
       let error: any
       let result: any
+      beforeEach(() => {
+        openpgp.key.readArmored.and.returnValue({ keys: [ livekey.key ] })
+        getLiveKey.and.returnValue(livekey)
+        cache.set.and.returnValue('key-handle')
+      })
+
       beforeEach((done) => {
         service.getKeysFromArmor('key-armor')
         .then((res: any) => result = res)
@@ -119,7 +134,9 @@ describe('OpgpService', () => {
       let error: any
       let result: any
       beforeEach(() => {
-        openpgp.key.readArmored.and.returnValue({ keys: [ key, key, key ] })
+        openpgp.key.readArmored.and.returnValue({ keys: [ livekey.key, livekey.key ] })
+        getLiveKey.and.returnValue(livekey)
+        cache.set.and.returnValue('key-handle') // would normally return unique values for each stored key
       })
 
       beforeEach((done) => {
@@ -131,7 +148,7 @@ describe('OpgpService', () => {
 
       it('returns a Promise that resolves to an {OpgpProxyKey} instance', () => {
         expect(result).toEqual(jasmine.any(Array))
-        expect(result.length).toBe(3)
+        expect(result.length).toBe(2)
         result.forEach((res: any) => {
           expect(res).toEqual(jasmine.objectContaining({ handle: 'key-handle' }))
           expect(res).toEqual(jasmine.objectContaining(livekey.bp))
@@ -166,7 +183,7 @@ describe('OpgpService', () => {
   ': Promise<string>', () => {
     let message: any
     beforeEach(() => {
-      message = jasmine.createSpyObj('message', [ 'sign', 'verify', 'armor' ])
+      message = jasmine.createSpyObj('message', [ 'sign', 'armor' ])
     })
 
     describe('when given a text string and a valid handle string that is not stale',
@@ -277,7 +294,7 @@ describe('OpgpService', () => {
   ': Promise<string>', () => {
     let message: any
     beforeEach(() => {
-      message = jasmine.createSpyObj('message', [ 'sign', 'verify', 'getText' ])
+      message = jasmine.createSpyObj('message', [ 'verify', 'getText' ])
     })
 
     describe('when given a signed armor text string and the valid handle string ' +
