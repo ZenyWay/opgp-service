@@ -179,23 +179,27 @@ export interface KeyRefMap {
 
 export interface OpgpKeyOpts {
   /**
-   * @prop {number=4096} numBits number of bits of the generated key.
+   * @prop {number=4096} size number of bits of the generated key.
    * should be 2048 or 4096.
    */
-  numBits: number
+  size: number
   /**
    * @prop {boolean=false} unlocked when true, the generated key is unlocked.
    */
   unlocked: boolean
   /**
-   * @prop {UserId[]=[]} userIds array of user IDs,
-   * e.g. [{ name:'Phil Zimmermann', email:'phil@openpgp.org' }]
+   * @prop {(UserId[]|UserId)=} users
+   * e.g. { name:'Phil Zimmermann', email:'phil@openpgp.org' }
+   * or 'Phil Zimmermann <phil@openpgp.org>'
    */
-  userIds: UserId[]
+  users: UserId[]|UserId
 }
 
-export interface UserId {
+type UserId = UserIdSpec|string
 
+export interface UserIdSpec {
+  name?: string
+  email: string
 }
 
 export interface OpgpKeyringOpts {}
