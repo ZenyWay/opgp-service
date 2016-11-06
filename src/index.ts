@@ -267,7 +267,16 @@ class OpgpServiceClass implements OpgpService {
   }
 
   lock (keyRef: KeyRef, passphrase: string, opts?: LockOpts): Promise<OpgpProxyKey> {
-    return
+    return Promise.try(() => {
+      const livekey = this.getCachedLiveKey(keyRef)
+      if (livekey.bp.isLocked) { // avoid unnecessary invalidation
+        return Promise.reject(new Error('key not unlocked'))
+      }
+      const handle = <string>getHandle(keyRef) // always valid because already successfully fetched from cache
+      this.cache.del(handle) // systematically invalidate original key from cache before mutation
+      return livekey.lock(passphrase) // mutates original key, regardless of outcome !
+    })
+    .then(locked => this.cacheAndProxyKey(locked))
   }
 
   encrypt (keyRefs: KeyRefMap, plain: string, opts?: EncryptOpts): Promise<string> {
