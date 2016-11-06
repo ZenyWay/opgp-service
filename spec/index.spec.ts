@@ -123,7 +123,16 @@ describe('OpgpService', () => {
         .finally(() => setTimeout(done))
       })
 
-      it('returns a Promise that resolves to an {OpgpProxyKey} instance', () => {
+      it('creates a new {OpgpLiveKey} instance from the openpgp key', () => {
+        expect(getLiveKey).toHaveBeenCalledWith(livekey.key)
+      })
+
+      it('stores the new {OpgpLiveKey} instance in the underlying cache', () => {
+        expect(cache.set).toHaveBeenCalledWith(livekey)
+      })
+
+      it('returns a Promise that resolves to a corresponding {OpgpProxyKey} instance',
+      () => {
         expect(result).toEqual(jasmine.objectContaining({ handle: 'key-handle' }))
         expect(result).toEqual(jasmine.objectContaining(livekey.bp))
         expect(error).not.toBeDefined()
@@ -146,7 +155,17 @@ describe('OpgpService', () => {
         .finally(() => setTimeout(done))
       })
 
-      it('returns a Promise that resolves to an {OpgpProxyKey} instance', () => {
+      it('creates new {OpgpLiveKey} instances from each openpgp key', () => {
+        expect(getLiveKey.calls.allArgs())
+        .toEqual([ [ livekey.key ], [ livekey.key ] ])
+      })
+
+      it('stores the new {OpgpLiveKey} instances in the underlying cache', () => {
+        expect(cache.set.calls.allArgs()).toEqual([ [ livekey ], [ livekey ] ])
+      })
+
+      it('returns a Promise that resolves to corresponding {OpgpProxyKey} instances',
+      () => {
         expect(result).toEqual(jasmine.any(Array))
         expect(result.length).toBe(2)
         result.forEach((res: any) => {
@@ -171,7 +190,7 @@ describe('OpgpService', () => {
         .finally(() => setTimeout(done))
       })
 
-      it('returns a Promise that resolves to an {OpgpProxyKey} instance', () => {
+      it('returns a Promise that rejects with the thrown error', () => {
         expect(error).toBeDefined()
         expect(error.message).toBe('boom')
         expect(result).not.toBeDefined()
@@ -194,7 +213,7 @@ describe('OpgpService', () => {
         cache.get.and.returnValue(livekey)
         openpgp.message.fromText.and.returnValue(message)
         message.sign.and.returnValue(message)
-        message.armor.and.returnValue('signed-text')
+        message.armor.and.returnValue('signed-armor-text')
       })
 
       beforeEach((done) => {
@@ -204,7 +223,8 @@ describe('OpgpService', () => {
         .finally(() => setTimeout(done))
       })
 
-      it('retrieves the livekey referenced by the given handle', () => {
+      it('retrieves the {OpgpLiveKey} instance referenced by the given handle',
+      () => {
         expect(cache.get).toHaveBeenCalledWith('valid-key-handle')
       })
 
@@ -214,9 +234,10 @@ describe('OpgpService', () => {
         expect(message.armor).toHaveBeenCalledWith()
       })
 
-      it('returns a Promise that resolves to the given text string ' +
-      'signed with the referenced {OpgpLiveKey} instance', () => {
-        expect(result).toBe('signed-text')
+      it('returns a Promise that resolves to an armor string ' +
+      'of the given text string ' +
+      'signed with the referenced {OpgpLiveKey} instance ', () => {
+        expect(result).toBe('signed-armor-text')
         expect(error).not.toBeDefined()
       })
     })
@@ -236,7 +257,8 @@ describe('OpgpService', () => {
         .finally(() => setTimeout(done))
       })
 
-      it('attempts to retrieve the livekey referenced by the given handle', () => {
+      it('attempts to retrieve the {OpgpLiveKey} instance ' +
+      'referenced by the given handle', () => {
         expect(cache.get).toHaveBeenCalledWith('stale-key-handle')
       })
 
@@ -267,9 +289,10 @@ describe('OpgpService', () => {
         .finally(() => setTimeout(done))
       })
 
-      it('attempts to retrieve the livekeys referenced by the given handles', () => {
+      it('attempts to retrieve the {OpgpLiveKey} instances ' +
+      'referenced by the given handles when compliant', () => {
         cache.get.calls.allArgs()
-        .forEach((args: any) => expect(args).toEqual([ 'valid handle' ]))
+        .forEach((args: any) => expect(args).toEqual([ 'compliant handle' ]))
       })
 
       it('does not delegate to the openpgp primitive', () => {
@@ -315,7 +338,8 @@ describe('OpgpService', () => {
         .finally(() => setTimeout(done))
       })
 
-      it('retrieves the livekey referenced by the given handle', () => {
+      it('retrieves the {OpgpLiveKey} instance referenced by the given handle',
+      () => {
         expect(cache.get).toHaveBeenCalledWith('valid-auth-key-handle')
       })
 
@@ -346,7 +370,8 @@ describe('OpgpService', () => {
         .finally(() => setTimeout(done))
       })
 
-      it('attempts to retrieve the livekey referenced by the given handle', () => {
+      it('attempts to retrieve the {OpgpLiveKey} instance ' +
+      'referenced by the given handle', () => {
         expect(cache.get).toHaveBeenCalledWith('stale-key-handle')
       })
 
@@ -377,9 +402,10 @@ describe('OpgpService', () => {
         .finally(() => setTimeout(done))
       })
 
-      it('attempts to retrieve the livekeys referenced by the given handles', () => {
+      it('attempts to retrieve the {OpgpLiveKey} instances ' +
+      'referenced by the given handles when compliant', () => {
         cache.get.calls.allArgs()
-        .forEach((args: any) => expect(args).toEqual([ 'valid handle' ]))
+        .forEach((args: any) => expect(args).toEqual([ 'compliant handle' ]))
       })
 
       it('does not delegate to the openpgp primitive', () => {
@@ -422,9 +448,9 @@ function getInvalidAuthArgs () {
 
   return nonStringTypes
   .filter((val: any) => !Array.isArray(val))
-  .map((invalidKeyRef: any) => [ invalidKeyRef, 'valid text' ])
+  .map((invalidKeyRef: any) => [ invalidKeyRef, 'compliant text' ])
   .concat(nonStringTypes
-    .map((invalidKeyRef: any) => [ [ invalidKeyRef ], 'valid text' ]))
+    .map((invalidKeyRef: any) => [ [ invalidKeyRef ], 'compliant text' ]))
   .concat(nonStringTypes
-    .map((invalidText: any) => [ 'valid handle', invalidText ]))
+    .map((invalidText: any) => [ 'compliant handle', invalidText ]))
 }
