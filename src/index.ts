@@ -35,6 +35,20 @@ export interface OpgpService {
    * @public
    * @method
    *
+   * Generate a new OpenPGP key pair.
+   * Currently only supports RSA keys.
+   * Primary and subkey will be of same type.
+   *
+   * @param {String} passphrase the passphrase used to encrypt the generated key.
+   * @param {OpgpKeyOpts={}} opts
+   *
+   * @returns {Promise<OpgpProxyKey>}
+   */
+  generateKey (passphrase: string, opts?: OpgpKeyOpts): Promise<OpgpProxyKey>
+  /**
+   * @public
+   * @method
+   *
    * @param {string} armor
    * @param {OpgpKeyringOpts} [opts] ignored
    *
@@ -119,6 +133,27 @@ export interface KeyRefMap {
   cipher: (OpgpProxyKey|string)[]
 }
 
+export interface OpgpKeyOpts {
+  /**
+   * @prop {number=4096} numBits number of bits of the generated key.
+   * should be 2048 or 4096.
+   */
+  numBits: number
+  /**
+   * @prop {boolean=false} unlocked when true, the generated key is unlocked.
+   */
+  unlocked: boolean
+  /**
+   * @prop {UserId[]=[]} userIds array of user IDs,
+   * e.g. [{ name:'Phil Zimmermann', email:'phil@openpgp.org' }]
+   */
+  userIds: UserId[]
+}
+
+export interface UserId {
+
+}
+
 export interface OpgpKeyringOpts {}
 
 export interface EncryptOpts {}
@@ -148,6 +183,10 @@ class OpgpServiceClass implements OpgpService {
     const openpgp = getOpenpgp(spec.openpgp)
     const getLiveKey = spec.getLiveKey || getLiveKeyFactory(openpgp)
     return new OpgpServiceClass(cache, getLiveKey, spec.getProxyKey || getProxyKey, openpgp)
+  }
+
+  generateKey (passphrase: string, opts?: OpgpKeyOpts): Promise<OpgpProxyKey> {
+    return
   }
 
   getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)
