@@ -61,6 +61,48 @@ export interface OpgpService {
    * @public
    * @method
    *
+   * @param {OpgpProxyKey|string} keyRef reference of key to unlock.
+   * @param {string} passphrase for unlocking referenced key.
+   * @param {UnlockOpts=} opts ignored
+   *
+   * @returns {Promise<OpgpProxyKey>}
+   * * a new {OpgpProxyKey} instance, unlocked
+   * * or the referenced {OpgpProxyKey} instance when it is already unlocked,
+   * or when unlocking fails.
+   *
+   * @memberOf OpgpService
+   */
+  unlock (keyRef: OpgpProxyKey|string, passphrase: string, opts?: UnlockOpts): Promise<OpgpProxyKey>
+  /**
+   * @public
+   * @method
+   *
+   * WARNING: unfortunately, this method mutates the underlying openpgp key !
+   *
+   * to help prevent unpleasant surprises,
+   * the referenced {OpgpProxyKey} instance is systematically invalidated
+   * when calling this method:
+   * subsequent calls to any {OpgpService} methods with this instance
+   * will consistently be rejected.
+   *
+   * @param {OpgpProxyKey|string} keyRef reference of key to unlock.
+   * always discard this {OpgpProxyKey} instance after calling this method.
+   * @param {string} passphrase
+   * @param {LockOpts} [opts]
+   *
+   * @returns {Promise<OpgpProxyKey>}
+   *
+   * @error {Error} when key encryption fails.
+   * the referenced {OpgpProxyKey} key is in an undefined state
+   * and should be discarded!
+   *
+   * @memberOf OpgpService
+   */
+  lock (keyRef: OpgpProxyKey|string, passphrase: string, opts?: LockOpts): Promise<OpgpProxyKey>
+  /**
+   * @public
+   * @method
+   *
    * @param {KeyProxyMap} keyRefs
    * must include both private authentication keys
    * with which to sign the message,
@@ -156,6 +198,10 @@ export interface UserId {
 
 export interface OpgpKeyringOpts {}
 
+export interface UnlockOpts {}
+
+export interface LockOpts {}
+
 export interface EncryptOpts {}
 
 export interface DecryptOpts {}
@@ -201,6 +247,14 @@ class OpgpServiceClass implements OpgpService {
       })
       return keys.length > 1 ? keys : keys[0]
     })
+  }
+
+  unlock (keyRef: OpgpProxyKey|string, passphrase: string, opts?: UnlockOpts): Promise<OpgpProxyKey> {
+    return
+  }
+
+  lock (keyRef: OpgpProxyKey|string, passphrase: string, opts?: LockOpts): Promise<OpgpProxyKey> {
+    return
   }
 
   encrypt (keyRefs: KeyRefMap, plain: string, opts?: EncryptOpts): Promise<string> {
