@@ -245,13 +245,9 @@ class OpgpServiceClass implements OpgpService {
         numBits: opts && opts.size || 4096,
         unlocked: opts && !!opts.unlocked
       }
+
     	return this.openpgp.key.generateKey(options)
-			.then((key: any) => {
-      	const livekey = this.getLiveKey(key)
-        const handle = this.cache.set(livekey)
-      	return handle ? this.getProxyKey(handle, livekey.bp)
-        : Promise.reject(new Error('unrecoverable error'))
-      })
+			.then((key: any) => this.cacheAndProxyKey(this.getLiveKey(key)))
     })
   }
 
@@ -259,12 +255,8 @@ class OpgpServiceClass implements OpgpService {
   : Promise<OpgpProxyKey[]|OpgpProxyKey> {
   	return Promise.try(() => {
     	const keys = this.openpgp.key.readArmored(armor).keys
-			.map((key: any) => {
-      	const livekey = this.getLiveKey(key)
-        const handle = this.cache.set(livekey)
-      	return handle ? this.getProxyKey(handle, livekey.bp)
-        : Promise.reject(new Error('unrecoverable error'))
-      })
+			.map((key: any) => this.cacheAndProxyKey(this.getLiveKey(key)))
+
       return keys.length > 1 ? keys : keys[0]
     })
   }
@@ -344,6 +336,28 @@ class OpgpServiceClass implements OpgpService {
     const livekey = isString(handle) && this.cache.get(handle)
     if (!livekey) { throw new Error('invalid key reference: not a string or stale') }
     return livekey
+  }
+
+  /**
+   * @private
+   * @method
+   *
+   * cache the given livekey, and create a corresponding {OpgpProxyKey}.
+   *
+   * @param {OpgpLiveKey} livekey
+   *
+   * @returns {OpgpProxyKey} of the cached `livekey`
+   *
+   * @error {Error} 'fail to cache key'
+   *
+   * @memberOf OpgpServiceClass
+   */
+  cacheAndProxyKey (livekey: OpgpLiveKey): OpgpProxyKey {
+    const handle = this.cache.set(livekey)
+    if (!handle) {
+      throw new Error('fail to cache key')
+    }
+    return this.getProxyKey(handle, livekey.bp)
   }
 }
 
