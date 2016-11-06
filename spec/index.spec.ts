@@ -31,7 +31,12 @@ beforeEach(() => { // mock dependencies
     key: jasmine.createSpyObj('key', [ 'readArmored', 'generateKey' ]),
     message: jasmine.createSpyObj('message', [ 'fromText', 'readArmored' ])
   }
-  livekey = { key: {}, bp: { keys: [ { id: 'key-id' } ], user: { ids: [] } } }
+  livekey = {
+    key: {},
+    bp: { keys: [ { id: 'key-id' } ], user: { ids: [] } },
+    lock: jasmine.createSpy('lock'),
+    unlock: jasmine.createSpy('unlock')
+  }
 })
 
 describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' +
@@ -163,6 +168,10 @@ describe('OpgpService', () => {
         expect(result).not.toBeDefined()
       })
     })
+
+    describe('OgpgKeyOpts', () => {
+      // TODO
+    })
   })
 
   describe('getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)' +
@@ -260,6 +269,146 @@ describe('OpgpService', () => {
         expect(error).toBeDefined()
         expect(error.message).toBe('boom')
         expect(result).not.toBeDefined()
+      })
+    })
+  })
+
+  describe('unlock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts)' +
+  ': Promise<OpgpProxyKey>', () => {
+    describe('when given a valid handle string and the correct passphrase', () => {
+      let unlockedLiveKey: any
+      let error: any
+      let result: any
+      beforeEach(() => {
+        livekey.bp.isLocked = true
+        unlockedLiveKey = {
+          key: {},
+          bp: { isLocked: false, keys: [ { id: 'key-id' } ], user: { ids: [] } }
+        }
+
+        cache.get.and.returnValue(livekey)
+        livekey.unlock.and.returnValue(Promise.resolve(unlockedLiveKey))
+        cache.set.and.returnValue('unlocked-key-handle')
+      })
+
+      beforeEach((done) => {
+        service.unlock('valid-key-handle', 'secret passphrase')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instance referenced by the given handle',
+      () => {
+        expect(cache.get).toHaveBeenCalledWith('valid-key-handle')
+      })
+
+      it('delegates to the retrieved {OpgpLiveKey} instance', () => {
+        expect(livekey.unlock).toHaveBeenCalledWith('secret passphrase')
+      })
+
+      it('stores the unlocked key in the underlying cache', () => {
+        expect(cache.set).toHaveBeenCalledWith(unlockedLiveKey)
+      })
+
+      it('returns a Promise that resolves to an {OpgpProxyKey} instance ' +
+      'of the unlocked {OpgpLiveKey} instance', () => {
+        expect(result).toEqual(jasmine.objectContaining({ handle: 'unlocked-key-handle' }))
+        expect(result).toEqual(jasmine.objectContaining(unlockedLiveKey.bp))
+        expect(error).not.toBeDefined()
+      })
+    })
+
+    describe('when the referenced {OpgpLiveKey} instance is already unlocked',
+    () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        livekey.bp.isLocked = false
+        cache.get.and.returnValue(livekey)
+      })
+
+      beforeEach((done) => {
+        service.unlock('unlocked-key-handle', 'incorrect passphrase')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instance referenced by the given handle',
+      () => {
+        expect(cache.get).toHaveBeenCalledWith('unlocked-key-handle')
+      })
+
+      it('does not delegate to the retrieved {OpgpLiveKey} instance', () => {
+        expect(livekey.unlock).not.toHaveBeenCalled()
+      })
+
+      it('returns a Promise that resolves to a new {OpgpProxyKey} instance ' +
+      'of the referenced {OpgpLiveKey} instance', () => {
+        expect(result).toEqual(jasmine.objectContaining({ handle: 'unlocked-key-handle' }))
+        expect(result).toEqual(jasmine.objectContaining(livekey.bp))
+        expect(error).not.toBeDefined()
+      })
+    })
+
+    describe('when given a stale or invalid handle', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(undefined)
+      })
+
+      beforeEach((done) => {
+        service.unlock('stale-key-handle', 'secret passphrase')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('attempts to retrieve the {OpgpLiveKey} instance ' +
+      'referenced by the given handle', () => {
+        expect(cache.get).toHaveBeenCalledWith('stale-key-handle')
+      })
+
+      it('returns a Promise that rejects ' +
+      'with an `invalid key reference: not a string or stale` {Error}', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toEqual(jasmine.any(Error))
+        expect(error.message).toBe('invalid key reference: not a string or stale')
+      })
+    })
+
+    describe('when given an incorrect passphrase', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        livekey.bp.isLocked = true
+        cache.get.and.returnValue(livekey)
+        livekey.unlock.and.returnValue(Promise.resolve(livekey))
+      })
+
+      beforeEach((done) => {
+        service.unlock('valid-key-handle', 'incorrect passphrase')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instance referenced by the given handle',
+      () => {
+        expect(cache.get).toHaveBeenCalledWith('valid-key-handle')
+      })
+
+      it('delegates to the retrieved {OpgpLiveKey} instance', () => {
+        expect(livekey.unlock).toHaveBeenCalledWith('incorrect passphrase')
+      })
+
+      it('returns a Promise that rejects with a `fail to unlock key` {Error}',
+      () => {
+        expect(result).not.toBeDefined()
+        expect(error).toEqual(jasmine.any(Error))
+        expect(error.message).toBe('fail to unlock key')
       })
     })
   })

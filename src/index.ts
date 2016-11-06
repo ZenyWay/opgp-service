@@ -262,7 +262,17 @@ class OpgpServiceClass implements OpgpService {
   }
 
   unlock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts): Promise<OpgpProxyKey> {
-    return
+    return Promise.try(() => {
+      const livekey = this.getCachedLiveKey(keyRef)
+      if (!livekey.bp.isLocked) {
+        const handle = <string>getHandle(keyRef) // must be valid because required for fetching livekey
+        return getProxyKey(handle, livekey.bp)
+      }
+
+      return livekey.unlock(passphrase)
+      .then(unlocked => !unlocked.bp.isLocked ? this.cacheAndProxyKey(unlocked)
+      : Promise.reject(new Error('fail to unlock key')))
+    })
   }
 
   lock (keyRef: KeyRef, passphrase: string, opts?: LockOpts): Promise<OpgpProxyKey> {
@@ -332,8 +342,8 @@ class OpgpServiceClass implements OpgpService {
    * @memberOf OpgpServiceClass
    */
   getCachedLiveKey (keyRef: KeyRef): OpgpLiveKey {
-    const handle = isString(keyRef) ? keyRef : !!keyRef && keyRef.handle
-    const livekey = isString(handle) && this.cache.get(handle)
+    const handle = getHandle(keyRef)
+    const livekey = handle && this.cache.get(handle)
     if (!livekey) { throw new Error('invalid key reference: not a string or stale') }
     return livekey
   }
@@ -359,6 +369,20 @@ class OpgpServiceClass implements OpgpService {
     }
     return this.getProxyKey(handle, livekey.bp)
   }
+}
+
+/**
+ * @private
+ * @function
+ *
+ * @param {KeyRef} keyRef
+ *
+ * @returns {string|false}
+ * `false` when a `string` handle could not be extracted from the given `keyRef`
+ */
+function getHandle (keyRef: KeyRef): string|false {
+  const handle = isString(keyRef) ? keyRef : !!keyRef && keyRef.handle
+  return isString(handle) && handle
 }
 
 function getOpenpgp (config: any): any {
