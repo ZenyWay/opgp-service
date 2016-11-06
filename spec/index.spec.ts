@@ -99,6 +99,72 @@ describe('OpgpService', () => {
     })
   })
 
+  describe('generateKey (passphrase: string, opts?: OpgpKeyOpts)' +
+  ': Promise<OpgpProxyKey>', () => {
+    it('delegates to the openpgp primitive', () => {
+      service.generateKey('secret passphrase')
+      expect(openpgp.key.generateKey)
+      .toHaveBeenCalledWith(jasmine.objectContaining({
+        passphrase: 'secret passphrase',
+        numBits: 4096
+      }))
+    })
+
+    describe('when the underlying openpgp primitive returns a newly generated key',
+    () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        openpgp.key.generateKey.and.returnValue(Promise.resolve(livekey.key))
+        getLiveKey.and.returnValue(livekey)
+        cache.set.and.returnValue('key-handle')
+      })
+
+      beforeEach((done) => {
+        service.generateKey('secret passphrase')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('creates a new {OpgpLiveKey} instance from the new openpgp key', () => {
+        expect(getLiveKey).toHaveBeenCalledWith(livekey.key)
+      })
+
+      it('stores the new {OpgpLiveKey} instance in the underlying cache', () => {
+        expect(cache.set).toHaveBeenCalledWith(livekey)
+      })
+
+      it('returns a Promise that resolves to the new {OpgpProxyKey} instance',
+      () => {
+        expect(result).toEqual(jasmine.objectContaining({ handle: 'key-handle' }))
+        expect(result).toEqual(jasmine.objectContaining(livekey.bp))
+        expect(error).not.toBeDefined()
+      })
+    })
+
+    describe('when the underlying openpgp primitive throws an error', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        openpgp.key.generateKey.and.throwError('boom')
+      })
+
+      beforeEach((done) => {
+        service.generateKey('secret passphrase')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('returns a Promise that resolves to an {OpgpProxyKey} instance', () => {
+        expect(error).toBeDefined()
+        expect(error.message).toBe('boom')
+        expect(result).not.toBeDefined()
+      })
+    })
+  })
+
   describe('getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)' +
   ': Promise<OpgpProxyKey[]|OpgpProxyKey>', () => {
 

@@ -238,7 +238,21 @@ class OpgpServiceClass implements OpgpService {
   }
 
   generateKey (passphrase: string, opts?: OpgpKeyOpts): Promise<OpgpProxyKey> {
-    return
+    return Promise.try(() => {
+      const options = {
+        userIds: opts && [].concat(opts.users),
+        passphrase: passphrase,
+        numBits: opts && opts.size || 4096,
+        unlocked: opts && !!opts.unlocked
+      }
+    	return this.openpgp.key.generateKey(options)
+			.then((key: any) => {
+      	const livekey = this.getLiveKey(key)
+        const handle = this.cache.set(livekey)
+      	return handle ? this.getProxyKey(handle, livekey.bp)
+        : Promise.reject(new Error('unrecoverable error'))
+      })
+    })
   }
 
   getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)
