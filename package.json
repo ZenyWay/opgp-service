@@ -7,6 +7,10 @@
   "scripts": {
     "predist": "mkdirp dist && rimraf dist/*",
     "dist": "tsc -p src --outDir dist",
+    "example": "npm run example:bundle && npm run example:serve",
+    "example:serve": "http-server -c-1 -i -e html -o -p 6510 spec/example",
+    "preexample:bundle": "rimraf spec/example/*.js",
+    "example:bundle": "browserify spec/example/index.ts -p [ tsify --project spec/example ] -t brfs --exclude 'openpgp' --exclude 'bluebird' --exclude 'csrkey-cache' --exclude 'tslib' -o spec/example/index.js",
     "prepublish": "npm run dist",
     "pretest": "mkdirp spec/reports && rimraf spec/reports/*",
     "test": "karma start spec/karma.conf.js --single-run",
