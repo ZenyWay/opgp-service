@@ -48,29 +48,31 @@ async all the way streamlines error-control flow:
 # <a name="example"></a> EXAMPLE
 ```javascript
 import getService from 'opgp-service'
-import * as bluebird from 'bluebird'
+import * as Promise from 'bluebird'
+import fs = require('fs')
+const log = console.log.bind(console)
 
 const service = getService() // use defaults
 
-const armor =
-  ['-----BEGIN PGP PRIVATE KEY BLOCK-----',
-    'Version: GnuPG v2.0.19 (GNU/Linux)',
-    /* ... left out for brevity ... */
-    '-----END PGP PRIVATE KEY BLOCK-----'].join('\n')
+const armor = fs.readFileSync(`${__dirname}/<john.doe@example.com>.private.key`, 'utf8')
 const passphrase = 'passphrase to decrypt private key'
+const secret = 'rob says wow!'
 
-// import the key and unlock it
+log('import key...')
 const key = service.getKeysFromArmor(armor)
+.tap(() => log('key successfully imported!\nnow unlock key...'))
+
 const unlocked = key.then(key => service.unlock(key, passphrase))
+.tap(() => log('key successfully unlocked!\nnow encrypt then decrypt `${secret}`...'))
 
 // encrypt with public key, sign with private
 const cipher = unlocked
 .then(key => service.encrypt({ cipher: key, auth: key }, 'rob says wow!'))
 .tap(log) // '-----BEGIN PGP MESSAGE----- ... -----END PGP MESSAGE-----'
 
-// decrypt with decrypted private key, verify signature with public
+// decrypt with private key, verify signature with public
 const plain = Promise.join(unlocked, cipher,
-(unlocked, cipher) => service.decrypt({ cipher: key, auth: key }, cipher))
+(key, cipher) => service.decrypt({ cipher: key, auth: key }, cipher))
 .tap(log) // 'rob says wow!'
 ```
 
