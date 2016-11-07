@@ -108,13 +108,16 @@ describe('OpgpService', () => {
 
   describe('generateKey (passphrase: string, opts?: OpgpKeyOpts)' +
   ': Promise<OpgpProxyKey>', () => {
-    it('delegates to the openpgp primitive', () => {
+    it('delegates to the openpgp primitive', (done) => {
       service.generateKey('secret passphrase')
-      expect(openpgp.key.generateKey)
-      .toHaveBeenCalledWith(jasmine.objectContaining({
-        passphrase: 'secret passphrase',
-        numBits: 4096
-      }))
+      .catch(() => {}) // ignore
+      .finally(() => {
+        expect(openpgp.key.generateKey).toHaveBeenCalledWith(jasmine.objectContaining({
+          passphrase: 'secret passphrase',
+          numBits: 4096
+        }))
+        setTimeout(done)
+      })
     })
 
     describe('when the underlying openpgp primitive returns a newly generated key',
@@ -179,9 +182,13 @@ describe('OpgpService', () => {
   describe('getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)' +
   ': Promise<OpgpProxyKey[]|OpgpProxyKey>', () => {
 
-    it('delegates to the openpgp primitive', () => {
+    it('delegates to the openpgp primitive', (done) => {
       service.getKeysFromArmor('key-armor')
-      expect(openpgp.key.readArmored).toHaveBeenCalledWith('key-armor')
+      .catch(() => {}) // ignore
+      .finally(() => {
+        expect(openpgp.key.readArmored).toHaveBeenCalledWith('key-armor')
+        setTimeout(done)
+      })
     })
 
     describe('when the underlying openpgp primitive returns a single key', () => {
@@ -629,8 +636,8 @@ describe('OpgpService', () => {
       it('retrieves the {OpgpLiveKey} instances ' +
       'referenced by the given handles when compliant', () => {
         expect(cache.get.calls.allArgs()).toEqual([
-          [ 'valid-cipher-key-handle' ],
-          [ 'valid-auth-key-handle' ]
+          [ 'valid-auth-key-handle' ],
+          [ 'valid-cipher-key-handle' ]
         ])
       })
 
@@ -638,8 +645,8 @@ describe('OpgpService', () => {
         expect(openpgp.encrypt)
         .toHaveBeenCalledWith(jasmine.objectContaining({
           data: 'plain text',
-          publicKeys: [ livekey ],
-          privateKeys: [ livekey ]
+          publicKeys: [ livekey.key ],
+          privateKeys: [ livekey.key ]
         }))
       })
 
@@ -748,8 +755,8 @@ describe('OpgpService', () => {
       it('retrieves the {OpgpLiveKey} instances ' +
       'referenced by the given handles when compliant', () => {
         expect(cache.get.calls.allArgs()).toEqual([
-          [ 'valid-cipher-key-handle' ],
-          [ 'valid-auth-key-handle' ]
+          [ 'valid-auth-key-handle' ],
+          [ 'valid-cipher-key-handle' ]
         ])
       })
 
@@ -757,8 +764,8 @@ describe('OpgpService', () => {
         expect(openpgp.encrypt)
         .toHaveBeenCalledWith(jasmine.objectContaining({
           data: 'plain text',
-          publicKeys: [ livekey ],
-          privateKeys: [ livekey ]
+          publicKeys: [ livekey.key ],
+          privateKeys: [ livekey.key ]
         }))
       })
 
@@ -773,6 +780,11 @@ describe('OpgpService', () => {
 
   describe('decrypt (keyRefs: KeyRefMap, cipher: string, opts?: DecryptOpts)' +
   ': Promise<string>', () => {
+    let message: any
+    beforeEach(() => {
+      message = {}
+    })
+
     describe('when given a valid cipher text string, and valid handles of valid ' +
     'public authentication and a private cipher key', () => {
       let error: any
@@ -780,6 +792,7 @@ describe('OpgpService', () => {
       beforeEach(() => {
         livekey.bp.isLocked = false
         cache.get.and.returnValue(livekey)
+        openpgp.message.readArmored.and.returnValue(message)
         openpgp.decrypt.and.returnValue({ data: 'plain text' })
       })
 
@@ -797,17 +810,18 @@ describe('OpgpService', () => {
       it('retrieves the {OpgpLiveKey} instances ' +
       'referenced by the given handles when compliant', () => {
         expect(cache.get.calls.allArgs()).toEqual([
-          [ 'valid-auth-key-handle' ],
-          [ 'valid-cipher-key-handle' ]
+          [ 'valid-cipher-key-handle' ],
+          [ 'valid-auth-key-handle' ]
         ])
       })
 
       it('delegates to the openpgp primitive', () => {
+        expect(openpgp.message.readArmored).toHaveBeenCalledWith('cipher text')
         expect(openpgp.decrypt)
         .toHaveBeenCalledWith(jasmine.objectContaining({
-          message: 'cipher text',
-          publicKeys: [ livekey ],
-          privateKey: livekey
+          message: message,
+          publicKeys: [ livekey.key ],
+          privateKey: livekey.key
         }))
       })
 
@@ -846,6 +860,7 @@ describe('OpgpService', () => {
       })
 
       it('does not delegate to the openpgp primitive', () => {
+        expect(openpgp.message.readArmored).not.toHaveBeenCalled()
         expect(openpgp.decrypt).not.toHaveBeenCalled()
       })
 
@@ -883,6 +898,7 @@ describe('OpgpService', () => {
       })
 
       it('does not delegate to the openpgp primitive', () => {
+        expect(openpgp.message.readArmored).not.toHaveBeenCalled()
         expect(openpgp.decrypt).not.toHaveBeenCalled()
       })
 
@@ -900,6 +916,7 @@ describe('OpgpService', () => {
       beforeEach(() => {
         livekey.bp.isLocked = false
         cache.get.and.returnValue(livekey)
+        openpgp.message.readArmored.and.returnValue(message)
         openpgp.decrypt.and.returnValue(Promise.reject(new Error('boom')))
       })
 
@@ -908,7 +925,7 @@ describe('OpgpService', () => {
           cipher: 'valid-cipher-key-handle',
           auth: 'valid-auth-key-handle'
         }
-        service.decrypt(refs, 'plain text')
+        service.decrypt(refs, 'cipher text')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
@@ -917,17 +934,18 @@ describe('OpgpService', () => {
       it('retrieves the {OpgpLiveKey} instances ' +
       'referenced by the given handles when compliant', () => {
         expect(cache.get.calls.allArgs()).toEqual([
-          [ 'valid-auth-key-handle' ],
-          [ 'valid-cipher-key-handle' ]
+          [ 'valid-cipher-key-handle' ],
+          [ 'valid-auth-key-handle' ]
         ])
       })
 
       it('delegates to the openpgp primitive', () => {
+        expect(openpgp.message.readArmored).toHaveBeenCalledWith('cipher text')
         expect(openpgp.decrypt)
         .toHaveBeenCalledWith(jasmine.objectContaining({
-          message: 'plain text',
-          publicKeys: [ livekey ],
-          privateKey: livekey
+          message: message,
+          publicKeys: [ livekey.key ],
+          privateKey: livekey.key
         }))
       })
 
@@ -972,7 +990,7 @@ describe('OpgpService', () => {
 
       it('delegates to the openpgp primitive', () => {
         expect(openpgp.message.fromText).toHaveBeenCalledWith('plain text')
-        expect(message.sign).toHaveBeenCalledWith([ livekey ])
+        expect(message.sign).toHaveBeenCalledWith([ livekey.key ])
         expect(message.armor).toHaveBeenCalledWith()
       })
 
@@ -1087,7 +1105,7 @@ describe('OpgpService', () => {
 
       it('delegates to the openpgp primitive', () => {
         expect(openpgp.message.readArmored).toHaveBeenCalledWith('signed armor text')
-        expect(message.verify).toHaveBeenCalledWith([ livekey ])
+        expect(message.verify).toHaveBeenCalledWith([ livekey.key ])
         expect(message.getText).toHaveBeenCalledWith()
       })
 
@@ -1131,7 +1149,7 @@ describe('OpgpService', () => {
 
       it('delegates to the openpgp primitive', () => {
         expect(openpgp.message.readArmored).toHaveBeenCalledWith('signed armor text')
-        expect(message.verify).toHaveBeenCalledWith([ livekey, livekey, livekey ])
+        expect(message.verify).toHaveBeenCalledWith([ livekey.key, livekey.key, livekey.key ])
         expect(message.getText).not.toHaveBeenCalled()
       })
 

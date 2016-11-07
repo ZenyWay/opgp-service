@@ -221,12 +221,14 @@ export interface OpgpService {
   verify (keyRefs: KeyRef[]|KeyRef, armor: string, opts?: VerifyOpts): Promise<string>
 }
 
-export type KeyRef = OpgpProxyKey|string
-
 export interface KeyRefMap {
   auth: KeyRef[]|KeyRef
   cipher: KeyRef[]|KeyRef
 }
+
+export type KeyRef = OpgpProxyKey|string
+
+export { OpgpProxyKey }
 
 export interface OpgpKeyOpts {
   /**
@@ -284,7 +286,7 @@ class OpgpServiceClass implements OpgpService {
     const spec = assign({}, config)
     const cache = spec.cache || getCache<OpgpLiveKey>()
     const openpgp = getOpenpgp(spec.openpgp)
-    const getLiveKey = spec.getLiveKey || getLiveKeyFactory(openpgp)
+    const getLiveKey = spec.getLiveKey || getLiveKeyFactory({ openpgp: openpgp })
     return new OpgpServiceClass(cache, getLiveKey, spec.getProxyKey || getProxyKey, openpgp)
   }
 
@@ -337,9 +339,9 @@ class OpgpServiceClass implements OpgpService {
   encrypt (keyRefs: KeyRefMap, plain: string, opts?: EncryptOpts): Promise<string> {
     return !isString(plain) ? reject('invalid plain text: not a string')
     : Promise.try(() => this.openpgp.encrypt({
-      data: plain,
-      publicKeys: this.getCachedLiveKeys(keyRefs.cipher),
-      privateKeys: this.getCachedPrivateKeys(keyRefs.auth)
+      privateKeys: this.getCachedPrivateOpenpgpKeys(keyRefs.auth),
+      publicKeys: this.getCachedOpenpgpKeys(keyRefs.cipher),
+      data: plain
     }))
     .get('data')
   }
@@ -347,16 +349,16 @@ class OpgpServiceClass implements OpgpService {
   decrypt (keyRefs: KeyRefMap, cipher: string, opts?: DecryptOpts): Promise<string> {
     return !isString(cipher) ? reject('invalid cipher: not a string')
     : Promise.try(() => this.openpgp.decrypt({
-      message: cipher,
-      publicKeys: this.getCachedLiveKeys(keyRefs.auth),
-      privateKey: this.getCachedPrivateKeys(keyRefs.cipher)[0]
+      privateKey: this.getCachedPrivateOpenpgpKeys(keyRefs.cipher)[0],
+      publicKeys: this.getCachedOpenpgpKeys(keyRefs.auth),
+      message: this.openpgp.message.readArmored(cipher)
     }))
     .get('data')
   }
 
   sign (keyRefs: KeyRef[]|KeyRef, text: string, opts?: SignOpts): Promise<string> {
   	return Promise.try(() => {
-      const keys = this.getCachedLiveKeys(keyRefs)
+      const keys = this.getCachedOpenpgpKeys(keyRefs)
 
       if (!isString(text)) { return reject('invalid text: not a string') }
       const message = this.openpgp.message.fromText(text)
@@ -367,7 +369,7 @@ class OpgpServiceClass implements OpgpService {
 
   verify (keyRefs: KeyRef[]|KeyRef, armor: string, opts?: VerifyOpts): Promise<string> {
   	return Promise.try(() => {
-      const keys = this.getCachedLiveKeys(keyRefs)
+      const keys = this.getCachedOpenpgpKeys(keyRefs)
 
       if (!isString(armor)) { return reject('invalid armor: not a string') }
       const message = this.openpgp.message.readArmored(armor)
@@ -443,7 +445,27 @@ class OpgpServiceClass implements OpgpService {
    * @param {(KeyRef[]|KeyRef)} keyRefs
    * key proxies and/or handles from key proxies
    *
-   * @returns {OpgpLiveKey[]}
+   * @returns {any[]} openpgp key
+   * from cache when proxies/handles are valid and not stale
+   *
+   * @error {Error} 'invalid or stale key reference'
+   *
+   * @error {Error} 'no key references'
+   *
+   * @memberOf OpgpServiceClass
+   */
+  getCachedOpenpgpKeys (keyRefs: KeyRef[]|KeyRef): any[] {
+    return this.getCachedLiveKeys(keyRefs).map(livekey => livekey.key)
+  }
+
+  /**
+   * @private
+   * @method
+   *
+   * @param {(KeyRef[]|KeyRef)} keyRefs
+   * key proxies and/or handles from key proxies
+   *
+   * @returns {any[]} private openpgp key
    * from cache when proxies/handles are valid, not stale and not locked
    *
    * @error {Error} 'invalid or stale key reference'
@@ -454,12 +476,12 @@ class OpgpServiceClass implements OpgpService {
    *
    * @memberOf OpgpServiceClass
    */
-  getCachedPrivateKeys (keyRefs: KeyRef[]|KeyRef): OpgpLiveKey[] {
+  getCachedPrivateOpenpgpKeys (keyRefs: KeyRef[]|KeyRef): any[] {
     const keys = this.getCachedLiveKeys(keyRefs)
     if (keys.some(key => key.bp.isLocked)) {
       throw new Error('private key not unlocked')
     }
-    return keys
+    return keys.map(livekey => livekey.key)
   }
 
   /**

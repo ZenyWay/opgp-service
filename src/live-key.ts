@@ -63,6 +63,17 @@ export interface LiveKeyFactoryOpts {}
  * @interface LiveKey
  */
 export interface OpgpLiveKey {
+  /**
+   * @prop {*} key openpgp key
+   *
+   * @memberOf OpgpLiveKey
+   */
+  key: any
+  /**
+   * @prop {OpgpKeyBlueprint} bp
+   *
+   * @memberOf OpgpLiveKey
+   */
   bp: OpgpKeyBlueprint
   /**
    * @returns {string} armor representation of the underlying openpgp key
@@ -191,7 +202,7 @@ class LiveKeyClass implements OpgpLiveKey {
 
   constructor (
     private readonly utils: any,
-    private key: any,
+    public key: any,
     public readonly bp: OpgpKeyBlueprint
   ) {}
 
