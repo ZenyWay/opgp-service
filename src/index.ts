@@ -42,6 +42,8 @@ export interface OpgpService {
    * @param {String} passphrase the passphrase used to encrypt the generated key.
    * @param {OpgpKeyOpts={}} opts
    *
+   * @error {Error} 'invalid passphrase: not a string'
+   *
    * @returns {Promise<OpgpProxyKey>}
    */
   generateKey (passphrase: string, opts?: OpgpKeyOpts): Promise<OpgpProxyKey>
@@ -53,6 +55,8 @@ export interface OpgpService {
    * @param {OpgpKeyringOpts} [opts] ignored
    *
    * @returns {(Promise<OpgpProxyKey[]|OpgpProxyKey>)} extracted from `armor`
+   *
+   * @error {Error} 'invalid armor: not a string'
    *
    * @memberOf OpgpService
    */
@@ -66,6 +70,12 @@ export interface OpgpService {
    * @param {UnlockOpts=} opts ignored
    *
    * @returns {Promise<OpgpProxyKey>} new unlocked instance
+   *
+   * @error {Error} 'invalid passphrase: not a string'
+   *
+   * @error {Error} 'invalid or stale key reference'
+   *
+   * @error {Error} 'no key references'
    *
    * @error {Error} 'key not locked'
    *
@@ -95,6 +105,12 @@ export interface OpgpService {
    *
    * @returns {Promise<OpgpProxyKey>} new locked instance
    *
+   * @error {Error} 'invalid passphrase: not a string'
+   *
+   * @error {Error} 'invalid or stale key reference'
+   *
+   * @error {Error} 'no key references'
+   *
    * @error {Error} 'key not unlocked'
    * the referenced {OpgpProxyKey} and its corresponding {OpgpLiveKey}
    * are not mutated.
@@ -121,6 +137,14 @@ export interface OpgpService {
    *
    * @error {Error} when encryption fails
    *
+   * @error {Error} 'invalid plain text: not a string'
+   *
+   * @error {Error} 'invalid or stale key reference'
+   *
+   * @error {Error} 'no key references'
+   *
+   * @error {Error} 'not all private are unlocked'
+   *
    * @memberOf OpgpService
    */
   encrypt (keyRefs: KeyRefMap, plain: string, opts?: EncryptOpts): Promise<string>
@@ -139,6 +163,14 @@ export interface OpgpService {
    *
    * @error {Error} when decryption fails
    *
+   * @error {Error} 'invalid cipher: not a string'
+   *
+   * @error {Error} 'invalid or stale key reference'
+   *
+   * @error {Error} 'no key references'
+   *
+   * @error {Error} 'not all private are unlocked'
+   *
    * @memberOf OpgpService
    */
   decrypt (keyRefs: KeyRefMap, cipher: string, opts?: DecryptOpts): Promise<string>
@@ -154,6 +186,12 @@ export interface OpgpService {
    * @returns {Promise<string>} signed text.
    *
    * @error {Error} when signature fails
+   *
+   * @error {Error} 'invalid text: not a string'
+   *
+   * @error {Error} 'invalid or stale key reference'
+   *
+   * @error {Error} 'no key references'
    *
    * @memberOf OpgpService
    */
@@ -171,6 +209,12 @@ export interface OpgpService {
    *
    * @error {Error} when verification fails.
    * tail of error message lists all IDs of keys for which authentication fails.
+   *
+   * @error {Error} 'invalid armor: not a string'
+   *
+   * @error {Error} 'invalid or stale key reference'
+   *
+   * @error {Error} 'no key references'
    *
    * @memberOf OpgpService
    */
@@ -245,7 +289,8 @@ class OpgpServiceClass implements OpgpService {
   }
 
   generateKey (passphrase: string, opts?: OpgpKeyOpts): Promise<OpgpProxyKey> {
-    return Promise.try(() => {
+    return !isString(passphrase) ? Promise.reject(new Error('invalid passphrase: not a string'))
+    : Promise.try(() => {
       const options = {
         userIds: opts && [].concat(opts.users),
         passphrase: passphrase,
@@ -260,7 +305,8 @@ class OpgpServiceClass implements OpgpService {
 
   getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)
   : Promise<OpgpProxyKey[]|OpgpProxyKey> {
-  	return Promise.try(() => {
+  	return !isString(armor) ? Promise.reject(new Error('invalid armor: not a string'))
+    : Promise.try(() => {
     	const keys = this.openpgp.key.readArmored(armor).keys
 			.map((key: any) => this.cacheAndProxyKey(this.getLiveKey(key)))
 
@@ -269,12 +315,14 @@ class OpgpServiceClass implements OpgpService {
   }
 
   unlock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts): Promise<OpgpProxyKey> {
-    return Promise.try(() => this.getCachedLiveKey(keyRef).unlock(passphrase))
+    return !isString(passphrase) ? Promise.reject(new Error('invalid passphrase: not a string'))
+    :Promise.try(() => this.getCachedLiveKey(keyRef).unlock(passphrase))
     .then(unlocked => this.cacheAndProxyKey(unlocked))
   }
 
   lock (keyRef: KeyRef, passphrase: string, opts?: LockOpts): Promise<OpgpProxyKey> {
-    return Promise.try(() => {
+    return !isString(passphrase) ? Promise.reject(new Error('invalid passphrase: not a string'))
+    : Promise.try(() => {
       const livekey = this.getCachedLiveKey(keyRef)
       if (livekey.bp.isLocked) { // avoid unnecessary invalidation
         return Promise.reject(new Error('key not unlocked'))
@@ -296,8 +344,7 @@ class OpgpServiceClass implements OpgpService {
 
   sign (keyRefs: KeyRef[]|KeyRef, text: string, opts?: SignOpts): Promise<string> {
   	return Promise.try(() => {
-      const keys = [].concat(keyRefs)
-      .map(keyRef => this.getCachedLiveKey(keyRef))
+      const keys = this.getCachedLiveKeys(keyRefs)
 
       if (!isString(text)) { return Promise.reject(new Error('invalid text: not a string')) }
       const message = this.openpgp.message.fromText(text)
@@ -308,8 +355,7 @@ class OpgpServiceClass implements OpgpService {
 
   verify (keyRefs: KeyRef[]|KeyRef, armor: string, opts?: VerifyOpts): Promise<string> {
   	return Promise.try(() => {
-      const keys = [].concat(keyRefs)
-      .map(keyRef => this.getCachedLiveKey(keyRef))
+      const keys = this.getCachedLiveKeys(keyRefs)
 
       if (!isString(armor)) { return Promise.reject(new Error('invalid armor: not a string')) }
       const message = this.openpgp.message.readArmored(armor)
@@ -353,6 +399,29 @@ class OpgpServiceClass implements OpgpService {
     const livekey = handle && this.cache.get(handle)
     if (!livekey) { throw new Error('invalid key reference: not a string or stale') }
     return livekey
+  }
+
+  /**
+   * @private
+   * @method
+   *
+   * @param {(KeyRef[]|KeyRef)} keyRefs
+   * key proxies and/or handles from key proxies
+   *
+   * @returns {OpgpLiveKey[]}
+   * from cache when proxies/handles are valid and not stale
+   *
+   * @error {Error} 'invalid or stale key reference'
+   *
+   * @error {Error} 'no key references'
+   *
+   * @memberOf OpgpServiceClass
+   */
+  getCachedLiveKeys (keyRefs: KeyRef[]|KeyRef): OpgpLiveKey[] {
+    const refs = [].concat(keyRefs)
+    if (!refs.length) { throw new Error('no key references') }
+
+    return refs.map(keyRef => this.getCachedLiveKey(keyRef))
   }
 
   /**
