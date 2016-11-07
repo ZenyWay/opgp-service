@@ -67,7 +67,7 @@ const unlocked = key.then(key => service.unlock(key, passphrase))
 
 // encrypt with public key, sign with private
 const cipher = unlocked
-.then(key => service.encrypt({ cipher: key, auth: key }, 'rob says wow!'))
+.then(key => service.encrypt({ cipher: key, auth: key }, secret))
 .tap(log) // '-----BEGIN PGP MESSAGE----- ... -----END PGP MESSAGE-----'
 
 // decrypt with private key, verify signature with public
@@ -75,6 +75,9 @@ const plain = Promise.join(unlocked, cipher,
 (key, cipher) => service.decrypt({ cipher: key, auth: key }, cipher))
 .tap(log) // 'rob says wow!'
 ```
+
+run the [above example](https://cdn.rawgit.com/ZenyWay/opgp-service/master/spec/example/index.html)
+in your browser.
 
 # <a name="api"></a> API
 run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/master/spec/web/index.html)
