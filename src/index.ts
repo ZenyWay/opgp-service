@@ -289,7 +289,7 @@ class OpgpServiceClass implements OpgpService {
   }
 
   generateKey (passphrase: string, opts?: OpgpKeyOpts): Promise<OpgpProxyKey> {
-    return !isString(passphrase) ? Promise.reject(new Error('invalid passphrase: not a string'))
+    return !isString(passphrase) ? reject('invalid passphrase: not a string')
     : Promise.try(() => {
       const options = {
         userIds: opts && [].concat(opts.users),
@@ -305,7 +305,7 @@ class OpgpServiceClass implements OpgpService {
 
   getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)
   : Promise<OpgpProxyKey[]|OpgpProxyKey> {
-  	return !isString(armor) ? Promise.reject(new Error('invalid armor: not a string'))
+  	return !isString(armor) ? reject('invalid armor: not a string')
     : Promise.try(() => {
     	const keys = this.openpgp.key.readArmored(armor).keys
 			.map((key: any) => this.cacheAndProxyKey(this.getLiveKey(key)))
@@ -315,17 +315,17 @@ class OpgpServiceClass implements OpgpService {
   }
 
   unlock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts): Promise<OpgpProxyKey> {
-    return !isString(passphrase) ? Promise.reject(new Error('invalid passphrase: not a string'))
+    return !isString(passphrase) ? reject('invalid passphrase: not a string')
     :Promise.try(() => this.getCachedLiveKey(keyRef).unlock(passphrase))
     .then(unlocked => this.cacheAndProxyKey(unlocked))
   }
 
   lock (keyRef: KeyRef, passphrase: string, opts?: LockOpts): Promise<OpgpProxyKey> {
-    return !isString(passphrase) ? Promise.reject(new Error('invalid passphrase: not a string'))
+    return !isString(passphrase) ? reject('invalid passphrase: not a string')
     : Promise.try(() => {
       const livekey = this.getCachedLiveKey(keyRef)
       if (livekey.bp.isLocked) { // avoid unnecessary invalidation
-        return Promise.reject(new Error('key not unlocked'))
+        return reject('key not unlocked')
       }
       const handle = <string>getHandle(keyRef) // always valid because already successfully fetched from cache
       this.cache.del(handle) // systematically invalidate original key from cache before mutation
@@ -346,7 +346,7 @@ class OpgpServiceClass implements OpgpService {
   	return Promise.try(() => {
       const keys = this.getCachedLiveKeys(keyRefs)
 
-      if (!isString(text)) { return Promise.reject(new Error('invalid text: not a string')) }
+      if (!isString(text)) { return reject('invalid text: not a string') }
       const message = this.openpgp.message.fromText(text)
 
       return message.sign(keys).armor()
@@ -357,7 +357,7 @@ class OpgpServiceClass implements OpgpService {
   	return Promise.try(() => {
       const keys = this.getCachedLiveKeys(keyRefs)
 
-      if (!isString(armor)) { return Promise.reject(new Error('invalid armor: not a string')) }
+      if (!isString(armor)) { return reject('invalid armor: not a string') }
       const message = this.openpgp.message.readArmored(armor)
 
       /**
@@ -369,7 +369,7 @@ class OpgpServiceClass implements OpgpService {
       .join()
 
       return !invalid ? message.getText()
-      : Promise.reject(new Error('authentication failed: ' + invalid))
+      : reject('authentication failed: ' + invalid)
     })
   }
 
@@ -445,6 +445,10 @@ class OpgpServiceClass implements OpgpService {
     }
     return this.getProxyKey(handle, livekey.bp)
   }
+}
+
+function reject (reason: string): Promise<any> {
+  return Promise.reject(new Error(reason))
 }
 
 /**
