@@ -335,11 +335,23 @@ class OpgpServiceClass implements OpgpService {
   }
 
   encrypt (keyRefs: KeyRefMap, plain: string, opts?: EncryptOpts): Promise<string> {
-    return
+    return !isString(plain) ? reject('invalid plain text: not a string')
+    : Promise.try(() => this.openpgp.encrypt({
+      data: plain,
+      publicKeys: this.getCachedLiveKeys(keyRefs.cipher),
+      privateKeys: this.getCachedPrivateKeys(keyRefs.auth)
+    }))
+    .get('data')
   }
 
   decrypt (keyRefs: KeyRefMap, cipher: string, opts?: DecryptOpts): Promise<string> {
-    return
+    return !isString(cipher) ? reject('invalid cipher: not a string')
+    : Promise.try(() => this.openpgp.encrypt({
+      message: cipher,
+      publicKeys: this.getCachedLiveKeys(keyRefs.auth),
+      privateKey: this.getCachedPrivateKeys(keyRefs.cipher)[0]
+    }))
+    .get('data')
   }
 
   sign (keyRefs: KeyRef[]|KeyRef, text: string, opts?: SignOpts): Promise<string> {
@@ -422,6 +434,32 @@ class OpgpServiceClass implements OpgpService {
     if (!refs.length) { throw new Error('no key references') }
 
     return refs.map(keyRef => this.getCachedLiveKey(keyRef))
+  }
+
+  /**
+   * @private
+   * @method
+   *
+   * @param {(KeyRef[]|KeyRef)} keyRefs
+   * key proxies and/or handles from key proxies
+   *
+   * @returns {OpgpLiveKey[]}
+   * from cache when proxies/handles are valid, not stale and not locked
+   *
+   * @error {Error} 'invalid or stale key reference'
+   *
+   * @error {Error} 'no key references'
+   *
+   * @error {Error} 'not all private are unlocked'
+   *
+   * @memberOf OpgpServiceClass
+   */
+  getCachedPrivateKeys (keyRefs: KeyRef[]|KeyRef): OpgpLiveKey[] {
+    const keys = this.getCachedLiveKeys(keyRefs)
+    if (keys.some(key => key.bp.isLocked)) {
+      throw new Error('not all private are unlocked')
+    }
+    return keys
   }
 
   /**

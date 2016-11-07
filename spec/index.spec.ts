@@ -29,7 +29,9 @@ beforeEach(() => { // mock dependencies
   openpgp = {
     crypto: { hash: jasmine.createSpyObj('hash', [ 'sha256' ]) },
     key: jasmine.createSpyObj('key', [ 'readArmored', 'generateKey' ]),
-    message: jasmine.createSpyObj('message', [ 'fromText', 'readArmored' ])
+    message: jasmine.createSpyObj('message', [ 'fromText', 'readArmored' ]),
+    encrypt: jasmine.createSpy('encrypt'),
+    decrypt: jasmine.createSpy('decrypt')
   }
   livekey = {
     key: {},
@@ -597,6 +599,107 @@ describe('OpgpService', () => {
         expect(result).not.toBeDefined()
         expect(error).toEqual(jasmine.any(Error))
         expect(error.message).toBe('boom')
+      })
+    })
+  })
+
+  describe('encrypt (keyRefs: KeyRefMap, plain: string, opts?: EncryptOpts)' +
+  ': Promise<string>', () => {
+    describe('when given a valid plain text string, and valid handles of valid ' +
+    'public cipher and private authentication keys', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        livekey.bp.isLocked = false
+        cache.get.and.returnValue(livekey)
+        openpgp.encrypt.and.returnValue({ data: 'cipher text' })
+      })
+
+      beforeEach((done) => {
+        const refs = {
+          cipher: 'valid-cipher-key-handle',
+          auth: 'valid-auth-key-handle'
+        }
+        service.encrypt(refs, 'plain text')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instances ' +
+      'referenced by the given handles when compliant', () => {
+        expect(cache.get.calls.allArgs()).toEqual([
+          [ 'valid-cipher-key-handle' ],
+          [ 'valid-auth-key-handle' ]
+        ])
+      })
+
+      it('delegates to the openpgp primitive', () => {
+        expect(openpgp.encrypt)
+        .toHaveBeenCalledWith(jasmine.objectContaining({
+          data: 'plain text',
+          publicKeys: [ livekey ],
+          privateKeys: [ livekey ]
+        }))
+      })
+
+      it('returns a Promise that resolves to an armor string ' +
+      'of the given text string ' +
+      'encrypted with the referenced cipher {OpgpLiveKey} instances and ' +
+      'signed with the referenced authentication {OpgpLiveKey} instances ', () => {
+        expect(result).toBe('cipher text')
+        expect(error).not.toBeDefined()
+      })
+    })
+  })
+
+  describe('decrypt (keyRefs: KeyRefMap, cipher: string, opts?: DecryptOpts)' +
+  ': Promise<string>', () => {
+    describe('when given a valid cipher text string, and valid handles of valid ' +
+    'public authentication and a private cipher key', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        livekey.bp.isLocked = false
+        cache.get.and.returnValue(livekey)
+        openpgp.encrypt.and.returnValue({ data: 'plain text' })
+      })
+
+      beforeEach((done) => {
+        const refs = {
+          cipher: 'valid-cipher-key-handle',
+          auth: 'valid-auth-key-handle'
+        }
+        service.decrypt(refs, 'cipher text')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instances ' +
+      'referenced by the given handles when compliant', () => {
+        expect(cache.get.calls.allArgs()).toEqual([
+          [ 'valid-auth-key-handle' ],
+          [ 'valid-cipher-key-handle' ]
+        ])
+      })
+
+      it('delegates to the openpgp primitive', () => {
+        expect(openpgp.encrypt)
+        .toHaveBeenCalledWith(jasmine.objectContaining({
+          message: 'cipher text',
+          publicKeys: [ livekey ],
+          privateKey: livekey
+        }))
+      })
+
+      it('returns a Promise that resolves to an armor string ' +
+      'of the given text string ' +
+      'decrypted with the referenced cipher {OpgpLiveKey} instance and ' +
+      'authenticated with the referenced authentication {OpgpLiveKey} instances ',
+      () => {
+        expect(result).toBe('plain text')
+        expect(error).not.toBeDefined()
       })
     })
   })
