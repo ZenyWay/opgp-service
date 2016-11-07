@@ -17,7 +17,7 @@
     "test:ci": "karma start spec/karma-coverage.conf.js --single-run && remap-istanbul -i spec/reports/coverage/chrom*/coverage.json -o spec/reports/coverage/lcov.info -t lcovonly",
     "test:web:serve": "http-server -c-1 -o -p 6510 spec/web",
     "pretest:web": "rimraf spec/web/*.js",
-    "test:web": "browserify spec/*.spec.ts -p [ tsify --project spec ] -t aliasify -t uglifyify -o spec/web/index.spec.js && npm run test:web:serve"
+    "test:web": "browserify spec/*.spec.ts -p [ tsify --project spec ] --exclude 'openpgp' --exclude 'bluebird' --exclude 'csrkey-cache' --exclude 'tslib' -t uglifyify -o spec/web/index.spec.js && npm run test:web:serve"
   },
   "repository": {
     "type": "git",
@@ -48,15 +48,15 @@
   },
   "devDependencies": {
     "@types/bluebird": "^3.0.35",
-    "@types/jasmine": "^2.5.35",
-    "@types/node": "^4.0.30",
-    "aliasify": "^2.0.0",
-    "browserify": "^13.1.0",
+    "@types/jasmine": "^2.5.37",
+    "@types/node": "^6.0.46",
+    "brfs": "^1.4.3",
+    "browserify": "^13.1.1",
     "browserify-istanbul": "^2.0.0",
     "concurrently": "^3.1.0",
     "coveralls": "^2.11.14",
     "cpx": "^1.5.0",
-    "eslint": "^3.8.1",
+    "eslint": "^3.9.1",
     "http-server": "^0.9.0",
     "istanbul": "^0.4.5",
     "jasmine-core": "^2.5.2",
@@ -74,7 +74,7 @@
     "remap-istanbul": "^0.7.0",
     "rimraf": "^2.5.4",
     "tsify": "^2.0.2",
-    "typescript": "^2.0.6",
+    "typescript": "^2.0.7",
     "uglifyify": "^3.0.4",
     "watchify": "^3.7.0"
   }
