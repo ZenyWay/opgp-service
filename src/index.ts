@@ -143,7 +143,7 @@ export interface OpgpService {
    *
    * @error {Error} 'no key references'
    *
-   * @error {Error} 'not all private are unlocked'
+   * @error {Error} 'private key not unlocked'
    *
    * @memberOf OpgpService
    */
@@ -169,7 +169,7 @@ export interface OpgpService {
    *
    * @error {Error} 'no key references'
    *
-   * @error {Error} 'not all private are unlocked'
+   * @error {Error} 'private key not unlocked'
    *
    * @memberOf OpgpService
    */
@@ -346,7 +346,7 @@ class OpgpServiceClass implements OpgpService {
 
   decrypt (keyRefs: KeyRefMap, cipher: string, opts?: DecryptOpts): Promise<string> {
     return !isString(cipher) ? reject('invalid cipher: not a string')
-    : Promise.try(() => this.openpgp.encrypt({
+    : Promise.try(() => this.openpgp.decrypt({
       message: cipher,
       publicKeys: this.getCachedLiveKeys(keyRefs.auth),
       privateKey: this.getCachedPrivateKeys(keyRefs.cipher)[0]
@@ -450,14 +450,14 @@ class OpgpServiceClass implements OpgpService {
    *
    * @error {Error} 'no key references'
    *
-   * @error {Error} 'not all private are unlocked'
+   * @error {Error} 'private key not unlocked'
    *
    * @memberOf OpgpServiceClass
    */
   getCachedPrivateKeys (keyRefs: KeyRef[]|KeyRef): OpgpLiveKey[] {
     const keys = this.getCachedLiveKeys(keyRefs)
     if (keys.some(key => key.bp.isLocked)) {
-      throw new Error('not all private are unlocked')
+      throw new Error('private key not unlocked')
     }
     return keys
   }

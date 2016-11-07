@@ -651,6 +651,124 @@ describe('OpgpService', () => {
         expect(error).not.toBeDefined()
       })
     })
+
+    describe('when given a valid plain text string and a stale handle string',
+    () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(undefined)
+      })
+
+      beforeEach((done) => {
+        const refs = {
+          cipher: 'stale-key-handle',
+          auth: 'stale-key-handle'
+        }
+        service.encrypt(refs, 'plain text')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('attempts to retrieve the {OpgpLiveKey} instance ' +
+      'referenced by the given handle', () => {
+        expect(cache.get).toHaveBeenCalledWith('stale-key-handle')
+      })
+
+      it('does not delegate to the openpgp primitive', () => {
+        expect(openpgp.encrypt).not.toHaveBeenCalled()
+      })
+
+      it('returns a Promise that rejects ' +
+      'with an `invalid key reference: not a string or stale` {Error}', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toBeDefined()
+        expect(error.message).toBe('invalid key reference: not a string or stale')
+      })
+    })
+
+    describe('when given a valid plain text string, ' +
+    'and a valid handle string of a locked private key', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        livekey.bp.isLocked = true
+        cache.get.and.returnValue(livekey)
+      })
+
+      beforeEach((done) => {
+        const refs = {
+          cipher: 'cipher-key-handle',
+          auth: 'locked-auth-key-handle'
+        }
+        service.encrypt(refs, 'plain text')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('attempts to retrieve the {OpgpLiveKey} instance ' +
+      'referenced by the given handle', () => {
+        expect(cache.get).toHaveBeenCalledWith('locked-auth-key-handle')
+      })
+
+      it('does not delegate to the openpgp primitive', () => {
+        expect(openpgp.encrypt).not.toHaveBeenCalled()
+      })
+
+      it('returns a Promise that rejects ' +
+      'with an `private key not unlocked` {Error}', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toBeDefined()
+        expect(error.message).toBe('private key not unlocked')
+      })
+    })
+
+    describe('when the underlying openpgp primitive rejects with an {Error}', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        livekey.bp.isLocked = false
+        cache.get.and.returnValue(livekey)
+        openpgp.encrypt.and.returnValue(Promise.reject(new Error('boom')))
+      })
+
+      beforeEach((done) => {
+        const refs = {
+          cipher: 'valid-cipher-key-handle',
+          auth: 'valid-auth-key-handle'
+        }
+        service.encrypt(refs, 'plain text')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instances ' +
+      'referenced by the given handles when compliant', () => {
+        expect(cache.get.calls.allArgs()).toEqual([
+          [ 'valid-cipher-key-handle' ],
+          [ 'valid-auth-key-handle' ]
+        ])
+      })
+
+      it('delegates to the openpgp primitive', () => {
+        expect(openpgp.encrypt)
+        .toHaveBeenCalledWith(jasmine.objectContaining({
+          data: 'plain text',
+          publicKeys: [ livekey ],
+          privateKeys: [ livekey ]
+        }))
+      })
+
+      it('returns a Promise that rejects with the {Error} ' +
+      'from the openpgp primitive', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toEqual(jasmine.any(Error))
+        expect(error.message).toBe('boom')
+      })
+    })
   })
 
   describe('decrypt (keyRefs: KeyRefMap, cipher: string, opts?: DecryptOpts)' +
@@ -662,7 +780,7 @@ describe('OpgpService', () => {
       beforeEach(() => {
         livekey.bp.isLocked = false
         cache.get.and.returnValue(livekey)
-        openpgp.encrypt.and.returnValue({ data: 'plain text' })
+        openpgp.decrypt.and.returnValue({ data: 'plain text' })
       })
 
       beforeEach((done) => {
@@ -685,7 +803,7 @@ describe('OpgpService', () => {
       })
 
       it('delegates to the openpgp primitive', () => {
-        expect(openpgp.encrypt)
+        expect(openpgp.decrypt)
         .toHaveBeenCalledWith(jasmine.objectContaining({
           message: 'cipher text',
           publicKeys: [ livekey ],
@@ -700,6 +818,124 @@ describe('OpgpService', () => {
       () => {
         expect(result).toBe('plain text')
         expect(error).not.toBeDefined()
+      })
+    })
+
+    describe('when given a valid plain text string and a stale handle string',
+    () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(undefined)
+      })
+
+      beforeEach((done) => {
+        const refs = {
+          cipher: 'stale-key-handle',
+          auth: 'stale-key-handle'
+        }
+        service.decrypt(refs, 'cipher text')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('attempts to retrieve the {OpgpLiveKey} instance ' +
+      'referenced by the given handle', () => {
+        expect(cache.get).toHaveBeenCalledWith('stale-key-handle')
+      })
+
+      it('does not delegate to the openpgp primitive', () => {
+        expect(openpgp.decrypt).not.toHaveBeenCalled()
+      })
+
+      it('returns a Promise that rejects ' +
+      'with an `invalid key reference: not a string or stale` {Error}', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toBeDefined()
+        expect(error.message).toBe('invalid key reference: not a string or stale')
+      })
+    })
+
+    describe('when given a valid plain text string, ' +
+    'and a valid handle string of a locked private key', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        livekey.bp.isLocked = true
+        cache.get.and.returnValue(livekey)
+      })
+
+      beforeEach((done) => {
+        const refs = {
+          cipher: 'locked-cipher-key-handle',
+          auth: 'auth-key-handle'
+        }
+        service.decrypt(refs, 'cipher text')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('attempts to retrieve the {OpgpLiveKey} instance ' +
+      'referenced by the given handle', () => {
+        expect(cache.get).toHaveBeenCalledWith('locked-cipher-key-handle')
+      })
+
+      it('does not delegate to the openpgp primitive', () => {
+        expect(openpgp.decrypt).not.toHaveBeenCalled()
+      })
+
+      it('returns a Promise that rejects ' +
+      'with an `private key not unlocked` {Error}', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toBeDefined()
+        expect(error.message).toBe('private key not unlocked')
+      })
+    })
+
+    describe('when the underlying openpgp primitive rejects with an {Error}', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        livekey.bp.isLocked = false
+        cache.get.and.returnValue(livekey)
+        openpgp.decrypt.and.returnValue(Promise.reject(new Error('boom')))
+      })
+
+      beforeEach((done) => {
+        const refs = {
+          cipher: 'valid-cipher-key-handle',
+          auth: 'valid-auth-key-handle'
+        }
+        service.decrypt(refs, 'plain text')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instances ' +
+      'referenced by the given handles when compliant', () => {
+        expect(cache.get.calls.allArgs()).toEqual([
+          [ 'valid-auth-key-handle' ],
+          [ 'valid-cipher-key-handle' ]
+        ])
+      })
+
+      it('delegates to the openpgp primitive', () => {
+        expect(openpgp.decrypt)
+        .toHaveBeenCalledWith(jasmine.objectContaining({
+          message: 'plain text',
+          publicKeys: [ livekey ],
+          privateKey: livekey
+        }))
+      })
+
+      it('returns a Promise that rejects with the {Error} ' +
+      'from the openpgp primitive', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toEqual(jasmine.any(Error))
+        expect(error.message).toBe('boom')
       })
     })
   })
