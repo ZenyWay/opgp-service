@@ -76,12 +76,16 @@ const plain = Promise.join(unlocked, cipher,
 .tap(log) // 'rob says wow!'
 ```
 
-run the [above example](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.0.0/spec/example/index.html)
+run the [above example](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.0.0/spec/example/index.html)
 in your browser.
 
 # <a name="api"></a> API
-run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.0.0/spec/web/index.html)
+run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.0.0/spec/web/index.html)
 in your browser.
+
+note that [openpgp](https://npmjs.com/package/openpgp) is defined as a
+[peer dependency](https://docs.npmjs.com/files/package.json#peerdependencies)
+and should be added as a dependency in client modules.
 
 # <a name="contributing"></a> CONTRIBUTING
 see the [contribution guidelines](./CONTRIBUTING.md)
