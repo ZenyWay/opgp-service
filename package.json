@@ -1,6 +1,6 @@
 {
   "name": "opgp-service",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "a fully async API for openpgp that builds on ephemeral immutable keys and that does not leak cryptographic material.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,7 +10,7 @@
     "example": "npm run example:bundle && npm run example:serve",
     "example:serve": "http-server -c-1 -i -e html -o -p 6510 spec/example",
     "preexample:bundle": "rimraf spec/example/*.js",
-    "example:bundle": "browserify spec/example/index.ts -p [ tsify --project spec/example ] -t brfs --exclude 'openpgp' --exclude 'bluebird' --exclude 'csrkey-cache' --exclude 'tslib' -o spec/example/index.js",
+    "example:bundle": "browserify spec/example/index.ts -p [ tsify --project spec/example ] -t brfs --exclude 'openpgp' --exclude 'bluebird' --exclude 'csrkey-cache' --exclude 'lru-cache' --exclude 'base64-js' --exclude 'tslib' -t uglifyify -o spec/example/index.js",
     "prepublish": "npm run dist",
     "pretest": "mkdirp spec/reports && rimraf spec/reports/*",
     "test": "karma start spec/karma.conf.js --single-run",
@@ -21,7 +21,7 @@
     "test:ci": "karma start spec/karma-coverage.conf.js --single-run && remap-istanbul -i spec/reports/coverage/chrom*/coverage.json -o spec/reports/coverage/lcov.info -t lcovonly",
     "test:web:serve": "http-server -c-1 -o -p 6510 spec/web",
     "pretest:web": "rimraf spec/web/*.js",
-    "test:web": "browserify spec/*.spec.ts -p [ tsify --project spec ] --exclude 'openpgp' --exclude 'bluebird' --exclude 'csrkey-cache' --exclude 'tslib' -t uglifyify -o spec/web/index.spec.js && npm run test:web:serve"
+    "test:web": "browserify spec/*.spec.ts -p [ tsify --project spec ] --exclude 'openpgp' --exclude 'bluebird' --exclude 'csrkey-cache' --exclude 'lru-cache' --exclude 'base64-js' --exclude 'tslib' -t aliasify -t uglifyify -o spec/web/index.spec.js && npm run test:web:serve"
   },
   "repository": {
     "type": "git",
@@ -48,14 +48,18 @@
     "openpgp": ">= 2.x"
   },
   "dependencies": {
+    "@types/base64-js": "^1.2.5",
+    "base64-js": "^1.2.0",
     "bluebird": "^3.4.6",
-    "csrkey-cache": "^1.0.1",
+    "csrkey-cache": "^2.0.0",
+    "lru-cache": "^4.0.1",
     "tslib": "^1.1.0"
   },
   "devDependencies": {
     "@types/bluebird": "^3.0.35",
     "@types/jasmine": "^2.5.38",
     "@types/node": "^6.0.49",
+    "aliasify": "^2.1.0",
     "brfs": "^1.4.3",
     "browserify": "^13.1.1",
     "browserify-istanbul": "^2.0.0",
@@ -84,5 +88,11 @@
     "typescript": "^2.1.1",
     "uglifyify": "^3.0.4",
     "watchify": "^3.7.0"
+  },
+  "aliasify": {
+    "aliases": {
+      "base64-js": "base64Js",
+      "lru-cache": "lruCache"
+    }
   }
 }

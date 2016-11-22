@@ -13,7 +13,7 @@
  */
 ;
 import getLiveKeyFactory from '../src/live-key'
-const Buffer = require('buffer').Buffer
+import * as base64 from 'base64-js'
 
 let getLiveKey: any
 let openpgp: any
@@ -91,7 +91,7 @@ beforeEach(() => { // mock dependencies
     return clone
   }
 
-  openpgp.crypto.hash.sha256.and.returnValue(Buffer.from('c2hhMjU2', 'base64'))
+  openpgp.crypto.hash.sha256.and.returnValue(base64.toByteArray('c2hhMjU2'))
   openpgp.key.readArmored.and.callFake(() => ({ keys: [ cloneKey(key) ] }))
   openpgp.message.readArmored.and.returnValue(msg)
   openpgp.message.fromText.and.returnValue(msg)

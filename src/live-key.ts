@@ -14,7 +14,7 @@
 ;
 import { OpgpKeyBlueprint, OpgpKeyId } from './proxy-key'
 import { isString } from './utils'
-const Buffer = require('buffer').Buffer // incorrect type definitions
+import * as base64 from 'base64-js'
 import Promise = require('bluebird')
 import { __assign as assign } from 'tslib'
 
@@ -302,18 +302,17 @@ class OpenpgpKeyUtils {
    * @method
    *
    * @param {*} key openpgp key packet
-   * @param {{format?:string,hash?:string}} opts?
-   * 	 @prop {string=base64} format 'hex' for standard pgp fingerprint
-   *   @prop {string=sha256} hash 'sha1' for standard pgp fingerprint
+   * @param {{hash?:string}} opts?
+   *   @prop {string=sha256} hash
    *
-   * @returns {string}
+   * @returns {string} hash of `key` as base64 string
    *
    * @memberOf OpenpgpKeyUtils
    */
-  getFingerprintHash (key: any, opts?: { format: string, hash: string }): string {
+  getFingerprintHash (key: any, opts?: { hash: string }): string {
     const packets = key.writeOld()
     const hash = this.openpgp.crypto.hash[opts && opts.hash || 'sha256'](packets)
-    return Buffer.from(hash).toString(opts && opts.format || 'base64')
+    return base64.fromByteArray(hash)
   }
 
   /**
