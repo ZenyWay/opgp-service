@@ -2003,8 +2003,8 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
 },{}],5:[function(require,module,exports){
 "use strict";
 ;
-var src_1 = require('../../src');
-var Promise = require('bluebird');
+var src_1 = require("../../src");
+var Promise = require("bluebird");
 
 var log = console.log.bind(console);
 var service = src_1.default();
@@ -2025,12 +2025,12 @@ var plain = Promise.join(unlocked, cipher, function (key, cipher) { return servi
 },{"../../src":6,"bluebird":undefined}],6:[function(require,module,exports){
 "use strict";
 ;
-var live_key_1 = require('./live-key');
-var proxy_key_1 = require('./proxy-key');
-var utils_1 = require('./utils');
-var csrkey_cache_1 = require('csrkey-cache');
-var Promise = require('bluebird');
-var tslib_1 = require('tslib');
+var live_key_1 = require("./live-key");
+var proxy_key_1 = require("./proxy-key");
+var utils_1 = require("./utils");
+var csrkey_cache_1 = require("csrkey-cache");
+var Promise = require("bluebird");
+var tslib_1 = require("tslib");
 var OpgpServiceClass = (function () {
     function OpgpServiceClass(cache, getLiveKey, getProxyKey, openpgp) {
         this.cache = cache;
@@ -2161,15 +2161,15 @@ var OpgpServiceClass = (function () {
         }
         return this.getProxyKey(handle, livekey.bp);
     };
-    OpgpServiceClass.getInstance = function (config) {
-        var spec = tslib_1.__assign({}, config);
-        var cache = spec.cache || csrkey_cache_1.default();
-        var openpgp = getOpenpgp(spec.openpgp);
-        var getLiveKey = spec.getLiveKey || live_key_1.default({ openpgp: openpgp });
-        return new OpgpServiceClass(cache, getLiveKey, spec.getProxyKey || proxy_key_1.default, openpgp);
-    };
     return OpgpServiceClass;
 }());
+OpgpServiceClass.getInstance = function (config) {
+    var spec = tslib_1.__assign({}, config);
+    var cache = spec.cache || csrkey_cache_1.default();
+    var openpgp = getOpenpgp(spec.openpgp);
+    var getLiveKey = spec.getLiveKey || live_key_1.default({ openpgp: openpgp });
+    return new OpgpServiceClass(cache, getLiveKey, spec.getProxyKey || proxy_key_1.default, openpgp);
+};
 function reject(reason) {
     return Promise.reject(new Error(reason));
 }
@@ -2193,8 +2193,8 @@ exports.default = getOpgpService;
 "use strict";
 ;
 var Buffer = require('buffer').Buffer;
-var Promise = require('bluebird');
-var tslib_1 = require('tslib');
+var Promise = require("bluebird");
+var tslib_1 = require("tslib");
 var LiveKeyClass = (function () {
     function LiveKeyClass(utils, key, bp) {
         this.utils = utils;
@@ -2242,12 +2242,12 @@ var LiveKeyClass = (function () {
         var bp = utils.getKeyBlueprint(key);
         return new LiveKeyClass(utils, key, bp);
     };
-    LiveKeyClass.getFactory = function (config) {
-        var utils = new OpenpgpKeyUtils(config.openpgp);
-        return LiveKeyClass.getInstance.bind(LiveKeyClass, utils);
-    };
     return LiveKeyClass;
 }());
+LiveKeyClass.getFactory = function (config) {
+    var utils = new OpenpgpKeyUtils(config.openpgp);
+    return LiveKeyClass.getInstance.bind(LiveKeyClass, utils);
+};
 var OpenpgpKeyUtils = (function () {
     function OpenpgpKeyUtils(openpgp) {
         this.openpgp = openpgp;
@@ -2322,7 +2322,7 @@ exports.default = getLiveKeyFactory;
 },{"bluebird":undefined,"buffer":2,"tslib":undefined}],8:[function(require,module,exports){
 "use strict";
 ;
-var tslib_1 = require('tslib');
+var tslib_1 = require("tslib");
 var getProxyKey = function (handle, blueprint) {
     var proxy = tslib_1.__assign({ handle: handle }, blueprint);
     proxy.keys = blueprint.keys.map(function (keyId) { return tslib_1.__assign({}, keyId); });
