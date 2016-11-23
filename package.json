@@ -1,6 +1,6 @@
 {
   "name": "opgp-service",
-  "version": "2.0.1",
+  "version": "1.0.1",
   "description": "a fully async API for openpgp that builds on ephemeral immutable keys and that does not leak cryptographic material.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -44,15 +44,12 @@
     "url": "https://github.com/zenyway/opgp-service/issues"
   },
   "homepage": "https://github.com/zenyway/opgp-service#readme",
-  "peerDependencies": {
-    "openpgp": ">= 2.x"
-  },
   "dependencies": {
     "@types/base64-js": "^1.2.5",
     "base64-js": "^1.2.0",
     "bluebird": "^3.4.6",
-    "csrkey-cache": "^2.0.0",
-    "lru-cache": "^4.0.1",
+    "csrkey-cache": "^1.1.1",
+    "openpgp": "^2.3.5",
     "tslib": "^1.1.0"
   },
   "devDependencies": {
@@ -81,7 +78,6 @@
     "karma-safari-launcher": "^1.0.0",
     "karma-spec-reporter": "0.0.26",
     "mkdirp": "^0.5.1",
-    "openpgp": "^2.3.5",
     "remap-istanbul": "^0.7.0",
     "rimraf": "^2.5.4",
     "tsify": "^2.0.3",
