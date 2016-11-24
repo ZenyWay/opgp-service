@@ -65,6 +65,18 @@ export interface OpgpService {
    * @public
    * @method
    *
+   * @param {KeyRef} keyRef
+   *
+   * @return {Promise<string>}
+   * armored string representation of the referenced key.
+   *
+   * @memberOf OpgpService
+   */
+  getArmorFromKey (keyRef: KeyRef): Promise<string>
+  /**
+   * @public
+   * @method
+   *
    * @param {KeyRef} keyRef reference of key to unlock.
    * @param {string} passphrase for unlocking referenced key.
    * @param {UnlockOpts=} opts ignored
@@ -295,6 +307,7 @@ class OpgpServiceClass implements OpgpService {
     return [
       'generateKey',
       'getKeysFromArmor',
+      'getArmorFromKey',
       'unlock',
       'lock',
       'encrypt',
@@ -331,6 +344,10 @@ class OpgpServiceClass implements OpgpService {
 
       return keys.length > 1 ? keys : keys[0]
     })
+  }
+
+  getArmorFromKey (keyRef: KeyRef): Promise<string> {
+    return Promise.try(() => this.getCachedLiveKey(keyRef).armor())
   }
 
   unlock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts): Promise<OpgpProxyKey> {

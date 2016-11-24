@@ -36,6 +36,7 @@ beforeEach(() => { // mock dependencies
   livekey = {
     key: {},
     bp: { keys: [ { id: 'key-id' } ], user: { ids: [] } },
+    armor: jasmine.createSpy('armor'),
     lock: jasmine.createSpy('lock'),
     unlock: jasmine.createSpy('unlock')
   }
@@ -278,6 +279,98 @@ describe('OpgpService', () => {
         expect(error).toBeDefined()
         expect(error.message).toBe('boom')
         expect(result).not.toBeDefined()
+      })
+    })
+  })
+
+  describe('getArmorFromKey (keyRef: KeyRef): Promise<string>', () => {
+    describe('when given a valid key handle string', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(livekey)
+        livekey.armor.and.returnValue('armor')
+      })
+
+      beforeEach((done) => {
+        service.getArmorFromKey('valid-key-handle')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instance referenced by the given handle',
+      () => {
+        expect(cache.get).toHaveBeenCalledWith('valid-key-handle')
+      })
+
+      it('delegates to the retrieved {OpgpLiveKey} instance', () => {
+        expect(livekey.armor).toHaveBeenCalledWith()
+      })
+
+      it('returns a Promise that resolves to an armored {string} representation ' +
+      'of the referenced {OpgpLiveKey} instance', () => {
+        expect(result).toEqual('armor')
+        expect(error).not.toBeDefined()
+      })
+    })
+
+    describe('when given a stale or invalid handle', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(undefined)
+      })
+
+      beforeEach((done) => {
+        service.getArmorFromKey('stale-key-handle')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('attempts to retrieve the {OpgpLiveKey} instance ' +
+      'referenced by the given handle', () => {
+        expect(cache.get).toHaveBeenCalledWith('stale-key-handle')
+      })
+
+      it('returns a Promise that rejects ' +
+      'with an `invalid key reference: not a string or stale` {Error}', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toEqual(jasmine.any(Error))
+        expect(error.message).toBe('invalid key reference: not a string or stale')
+      })
+    })
+
+    describe('when the {OpgpLiveKey#armor} method rejects with an {Error}', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(livekey)
+        livekey.armor.and.returnValue(Promise.reject(new Error('boom')))
+      })
+
+      beforeEach((done) => {
+        service.getArmorFromKey('valid-key-handle')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instance referenced by the given handle',
+      () => {
+        expect(cache.get).toHaveBeenCalledWith('valid-key-handle')
+      })
+
+      it('delegates to the retrieved {OpgpLiveKey} instance', () => {
+        expect(livekey.armor).toHaveBeenCalledWith()
+      })
+
+      it('returns a Promise that rejects with the {Error} ' +
+      'from the {OpgpLiveKey#armor} method', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toEqual(jasmine.any(Error))
+        expect(error.message).toBe('boom')
       })
     })
   })

@@ -45,7 +45,20 @@ async all the way streamlines error-control flow:
 * all API methods return a `Promise`.
 * any exception thrown by `openpgp` is converted into a rejected `Promise`.
 
+# <a name="api"></a> API 1.1 stable
+run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.1.0/spec/web/index.html)
+in your browser.
+
 # <a name="example"></a> EXAMPLE
+a live version of this example can be viewed [here](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.1.0/spec/example/index.html)
+in the browser console,
+or by cloning this repository and running the following commands from a terminal:
+```bash
+npm install
+npm run example
+```
+the files of this example are available [here](./spec/example).
+
 ```javascript
 import getService from 'opgp-service'
 import * as Promise from 'bluebird'
@@ -75,13 +88,6 @@ const plain = Promise.join(unlocked, cipher,
 (key, cipher) => service.decrypt({ cipher: key, auth: key }, cipher))
 .tap(log) // 'rob says wow!'
 ```
-
-run the [above example](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.0.3/spec/example/index.html)
-in your browser.
-
-# <a name="api"></a> API
-run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.0.3/spec/web/index.html)
-in your browser.
 
 # <a name="contributing"></a> CONTRIBUTING
 see the [contribution guidelines](./CONTRIBUTING.md)
