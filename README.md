@@ -90,9 +90,10 @@ const cipher = unlocked
 .tap(log) // '-----BEGIN PGP MESSAGE----- ... -----END PGP MESSAGE-----'
 
 // decrypt with private key, verify signature with public
-const plain = Promise.join(unlocked, cipher,
-(key, cipher) => service.decrypt({ cipher: key, auth: key }, cipher))
+const plain = Promise.join(unlocked, cipher)
+.then(([key, cipher]) => service.decrypt({ cipher: key, auth: key }, cipher))
 .tap(log) // 'rob says wow!'
+.catch(log)
 ```
 
 # <a name="contributing"></a> CONTRIBUTING
