@@ -76,11 +76,11 @@ const plain = Promise.join(unlocked, cipher,
 .tap(log) // 'rob says wow!'
 ```
 
-run the [above example](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.0.1/spec/example/index.html)
+run the [above example](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.0.2/spec/example/index.html)
 in your browser.
 
 # <a name="api"></a> API
-run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.0.1/spec/web/index.html)
+run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.0.2/spec/web/index.html)
 in your browser.
 
 # <a name="contributing"></a> CONTRIBUTING
