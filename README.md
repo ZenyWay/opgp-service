@@ -9,11 +9,8 @@ that builds on ephemeral immutable keys and
 that does not leak cryptographic material.
 
 together with [worker-proxy](https://www.npmjs.com/package/worker-proxy),
-this service can easily be run in a WebWorker,
+this service can [easily be run in a WebWorker](https://gist.github.com/smcatala/bee0f411b08ec45933cb69264812a62e),
 confining the cryptographic material into a dedicated thread.
-
-the current version exposes a subset of [openpgp](https://openpgpjs.org/)'s
-functionality.
 
 ## cryptographic material is encapsulated
 client code operates on mere proxies of the openpgp keys, not the latter.
@@ -46,11 +43,20 @@ async all the way streamlines error-control flow:
 * any exception thrown by `openpgp` is converted into a rejected `Promise`.
 
 # <a name="api"></a> API 1.1 stable
-run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.1.0/spec/web/index.html)
-in your browser.
+the current version exposes the following service methods:
+* generateKey, getKeysFromArmor, getArmorFromKey
+* unlock, lock
+* encrypt, decrypt
+* sign, verify
+
+for a detailed specification of the API
+* run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.1.1/spec/web/index.html)
+in your browser,
+* or check the [public interface declaration](https://github.com/ZenyWay/opgp-service/blob/master/src/index.ts#L22-L234)
+in the source code.
 
 # <a name="example"></a> EXAMPLE
-a live version of this example can be viewed [here](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.1.0/spec/example/index.html)
+a live version of this example can be viewed [here](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.1.1/spec/example/index.html)
 in the browser console,
 or by cloning this repository and running the following commands from a terminal:
 ```bash
