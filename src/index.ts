@@ -287,7 +287,24 @@ class OpgpServiceClass implements OpgpService {
     const cache = spec.cache || getCache<OpgpLiveKey>()
     const openpgp = getOpenpgp(spec.openpgp)
     const getLiveKey = spec.getLiveKey || getLiveKeyFactory({ openpgp: openpgp })
-    return new OpgpServiceClass(cache, getLiveKey, spec.getProxyKey || getProxyKey, openpgp)
+
+    const instance =
+    new OpgpServiceClass(cache, getLiveKey, spec.getProxyKey || getProxyKey, openpgp)
+
+    const service = <OpgpService> {}
+    return [
+      'generateKey',
+      'getKeysFromArmor',
+      'unlock',
+      'lock',
+      'encrypt',
+      'decrypt',
+      'sign',
+      'verify'
+    ].reduce((service, key) => {
+      service[key] = instance[key].bind(instance)
+      return service
+    }, service)
   }
 
   generateKey (passphrase: string, opts?: OpgpKeyOpts): Promise<OpgpProxyKey> {
