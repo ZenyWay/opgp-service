@@ -16,6 +16,7 @@ import getLiveKeyFactory, { LiveKeyFactory, OpgpLiveKey } from './live-key'
 import getProxyKey, { ProxyKeyFactory, OpgpProxyKey } from './proxy-key'
 import { isString } from './utils'
 import getCache, { CsrKeyCache } from 'csrkey-cache'
+const openpgp = require('openpgp')
 import * as Promise from 'bluebird'
 import { __assign as assign } from 'tslib'
 
@@ -559,9 +560,28 @@ function getHandle (keyRef: KeyRef): string|false {
   return isString(handle) && handle
 }
 
-function getOpenpgp (config: any): any {
-  const openpgp = isOpenpgp(config) ? config : require('openpgp')
-  // TODO configure openpgp
+/**
+ * default settings for `openpgp.config`
+ */
+const OPENPGP_CONFIG_DEFAULTS = {
+  aead_protect: true
+}
+
+/**
+ * @private
+ * @function
+ *
+ * @param {*=} config
+ *
+ * @returns {*}
+ * * the given `config` object, when it is an `openpgp` instance  ,
+ * * otherwise a new `openpgp` instance,
+ * configured with the `config` object assigned to `openpgp.config`,
+ * or [default settings]{@link OPENPGP_CONFIG_DEFAULTS}.
+ */
+function getOpenpgp (config?: any): any {
+  if (isOpenpgp(config)) { return config }
+  assign(openpgp.config, OPENPGP_CONFIG_DEFAULTS, config)
   return openpgp
 }
 

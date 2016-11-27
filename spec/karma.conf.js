@@ -13,7 +13,7 @@
  */
 ;
 var browsers = [
-  'Firefox',
+//  'Firefox',
   process.env.TRAVIS ? 'Chrome--no-sandbox' : 'Chrome'
 ]
 
@@ -58,12 +58,7 @@ module.exports = function (config) {
     },
     browserify: { // https://github.com/nikku/karma-browserify#plugins
       debug: true,
-      plugin: [ [ 'tsify' ] ] /*,
-      configure: function (bundle) {
-        bundle.on('prebundle', function () {
-          bundle.require('_cut_', { expose: '' }) // stub dependencies
-        })
-      } */
+      plugin: [ [ 'tsify' ], [ 'proxyquire-universal' ] ]
     },
     reporters: [ // 'progress' | 'dots' | 'kjhtml' | 'junit' | 'spec' | ' coverage'
       'spec', 'kjhtml', 'junit'

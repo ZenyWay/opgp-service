@@ -1,6 +1,6 @@
 {
   "name": "opgp-service",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "a fully async API for openpgp that builds on ephemeral immutable keys and that does not leak cryptographic material.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -21,7 +21,7 @@
     "test:ci": "karma start spec/karma-coverage.conf.js --single-run && remap-istanbul -i spec/reports/coverage/chrom*/coverage.json -o spec/reports/coverage/lcov.info -t lcovonly",
     "test:web:serve": "http-server -c-1 -o -p 6510 spec/web",
     "pretest:web": "rimraf spec/web/*.js",
-    "test:web": "browserify spec/*.spec.ts -p [ tsify --project spec ] --exclude 'openpgp' --exclude 'bluebird' --exclude 'csrkey-cache' --exclude 'lru-cache' --exclude 'base64-js' --exclude 'tslib' -t aliasify -t uglifyify -o spec/web/index.spec.js && npm run test:web:serve"
+    "test:web": "browserify spec/*.spec.ts -p [ tsify --project spec ] -p [ 'proxyquire-universal' ] --exclude 'openpgp' --exclude 'bluebird' --exclude 'csrkey-cache' --exclude 'lru-cache' --exclude 'base64-js' --exclude 'tslib' -t aliasify -o spec/web/index.spec.js && npm run test:web:serve"
   },
   "repository": {
     "type": "git",
@@ -78,6 +78,9 @@
     "karma-safari-launcher": "^1.0.0",
     "karma-spec-reporter": "0.0.26",
     "mkdirp": "^0.5.1",
+    "proxyquire": "^1.7.10",
+    "proxyquire-universal": "^1.0.8",
+    "proxyquireify": "^3.2.1",
     "remap-istanbul": "^0.7.0",
     "rimraf": "^2.5.4",
     "tsify": "^2.0.3",

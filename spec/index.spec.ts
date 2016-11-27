@@ -12,9 +12,13 @@
  * Limitations under the License.
  */
 ;
-import getService from '../src'
-import * as Promise from 'bluebird'
+import Promise = require('bluebird')
 
+(function () { // workaround for https://github.com/smcatala/proxyquire-strict-mode-issue
+'use strict'
+const proxyquire = require('proxyquire')
+
+let getService: any
 let cache: any
 let getLiveKey: any
 let getProxyKey: any
@@ -27,6 +31,7 @@ beforeEach(() => { // mock dependencies
   getLiveKey = jasmine.createSpy('getLiveKey')
   getProxyKey = jasmine.createSpy('getProxyKey')
   openpgp = {
+    config: {},
     crypto: { hash: jasmine.createSpyObj('hash', [ 'sha256' ]) },
     key: jasmine.createSpyObj('key', [ 'readArmored', 'generateKey' ]),
     message: jasmine.createSpyObj('message', [ 'fromText', 'readArmored' ]),
@@ -40,6 +45,13 @@ beforeEach(() => { // mock dependencies
     lock: jasmine.createSpy('lock'),
     unlock: jasmine.createSpy('unlock')
   }
+})
+
+beforeEach(() => {
+  getService = proxyquire('../src/index.ts', {
+    'openpgp': openpgp,
+    '@noCallThru': true
+  }).default
 })
 
 describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' +
@@ -58,6 +70,7 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
   describe('when called without arguments', () => {
     let service: any
     beforeEach(() => {
+      debugger
       service = getService()
     })
 
@@ -92,6 +105,27 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
       expect(getLiveKey).toHaveBeenCalledWith(livekey.key)
       expect(cache.set).toHaveBeenCalledWith(livekey)
       expect(getProxyKey).toHaveBeenCalledWith('key-handle', livekey.bp)
+    })
+  })
+
+  describe('when called with { openpgp?: config } ' +
+  'where config is a configuration object for `openpgp.config`', () => {
+    beforeEach(() => {
+      openpgp.config = {}
+    })
+
+    beforeEach(() => {
+      debugger
+      getService({
+        openpgp: {
+          foo: 'foo'
+        }
+      })
+    })
+
+    it('returns an {OpgpService} instance based on an openpgp instance ' +
+    'with the given configuration', () =>{
+      expect(openpgp.config).toEqual(jasmine.objectContaining({ foo: 'foo' }))
     })
   })
 })
@@ -1354,3 +1388,4 @@ function getInvalidAuthArgs () {
   .concat(nonStringTypes
     .map((invalidText: any) => [ 'compliant handle', invalidText ]))
 }
+}())
