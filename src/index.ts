@@ -14,7 +14,7 @@
 ;
 import getLiveKeyFactory, { LiveKeyFactory, OpgpLiveKey } from './live-key'
 import getProxyKey, { ProxyKeyFactory, OpgpProxyKey } from './proxy-key'
-import { isString } from './utils'
+import { isString, isNumber, isBoolean, isFunction } from './utils'
 import getCache, { CsrKeyCache } from 'csrkey-cache'
 const openpgp = require('openpgp')
 import * as Promise from 'bluebird'
@@ -32,6 +32,24 @@ export interface OpgpServiceFactoryConfig {
 }
 
 export interface OpgpService {
+  /**
+   * @public
+   * @method
+   *
+   * read or set the current `openpgp.config` settings.
+   *
+   * @param {OpenpgpConfig=} config
+   *
+   * @returns {Promise<OpenpgpConfig>}
+   * current openpgp settings when `config` is `undefined`
+   * or empty or does not include any valid setting entries,
+   * otherwise the openpgp settings after applying
+   * the valid setting entries from `config`.
+   *
+   * @memberOf OpgpService
+   */
+  configure (config?: OpenpgpConfig): Promise<OpenpgpConfig>
+
   /**
    * @public
    * @method
@@ -268,6 +286,103 @@ export interface UserIdSpec {
   email: string
 }
 
+/**
+ * openpgp configuration object, as of openpgp 2.3.5
+ *
+ * @public
+ * @interface OpenpgpConfig
+ */
+export interface OpenpgpConfig {
+  prefer_hash_algorithm: number,
+  encryption_cipher: number,
+  compression: number,
+  /**
+   * use Authenticated Encryption with Additional Data (AEAD) protection
+   * for symmetric encryption.
+   *
+   * @type {boolean=true}
+   * @memberOf OpenpgpConfig
+   */
+  aead_protect: boolean,
+  /**
+   * use integrity protection for symmetric encryption.
+   *
+   * @type {boolean=true}
+   * @memberOf OpenpgpConfig
+   */
+  integrity_protect: boolean,
+  /**
+   * fail on decrypt if message is not integrity protected.
+   *
+   * @type {boolean=false}
+   * @memberOf OpenpgpConfig
+   */
+  ignore_mdc_error: boolean,
+  /**
+   *
+   * @type {boolean=true}
+   * @memberOf OpenpgpConfig
+   */
+  rsa_blinding: boolean,
+  /**
+   * use native node.js crypto and Web Crypto apis (if available).
+   *
+   * @type {boolean=true}
+   * @memberOf OpenpgpConfig
+   */
+  use_native: boolean,
+  /**
+   * use transferable objects between the Web Worker and main thread.
+   *
+   * @type {boolean=false}
+   * @memberOf OpenpgpConfig
+   */
+  zero_copy: boolean,
+  /**
+   *
+   * @type {boolean=false}
+   * @memberOf OpenpgpConfig
+   */
+  debug: false,
+  /**
+   *
+   * @type {boolean=true}
+   * @memberOf OpenpgpConfig
+   */
+  show_version: true,
+  /**
+   *
+   * @type {boolean=true}
+   * @memberOf OpenpgpConfig
+   */
+  show_comment: true,
+  /**
+   *
+   * @type {string='OpenPGP.js VERSION'}
+   * @memberOf OpenpgpConfig
+   */
+  versionstring: string,
+  /**
+   *
+   * @type {string='http://openpgpjs.org'}
+   * @memberOf OpenpgpConfig
+   */
+  commentstring: string,
+  /**
+   *
+   * @type {string='https://keyserver.ubuntu.com'}
+   * @memberOf OpenpgpConfig
+   */
+  keyserver: string,
+  /**
+   *
+   * @type {string='./openpgp.store'}
+   * @memberOf OpenpgpConfig
+   */
+  node_store: string
+
+}
+
 export interface OpgpKeyringOpts {}
 
 export interface UnlockOpts {}
@@ -304,21 +419,15 @@ class OpgpServiceClass implements OpgpService {
     const instance =
     new OpgpServiceClass(cache, getLiveKey, spec.getProxyKey || getProxyKey, openpgp)
 
-    const service = <OpgpService> {}
-    return [
-      'generateKey',
-      'getKeysFromArmor',
-      'getArmorFromKey',
-      'unlock',
-      'lock',
-      'encrypt',
-      'decrypt',
-      'sign',
-      'verify'
-    ].reduce((service, key) => {
-      service[key] = instance[key].bind(instance)
+    return OpgpServiceClass.PUBLIC_METHODS.reduce((service, method) => {
+      service[method] = instance[method].bind(instance)
       return service
-    }, service)
+    }, <OpgpService> {})
+  }
+
+  configure (config?: OpenpgpConfig): Promise<OpenpgpConfig> {
+    const openpgp = configureOpenpgp(this.openpgp, config)
+    return Promise.resolve(assign({}, openpgp.config))
   }
 
   generateKey (passphrase: string, opts?: OpgpKeyOpts): Promise<OpgpProxyKey> {
@@ -428,6 +537,19 @@ class OpgpServiceClass implements OpgpService {
     private getProxyKey: ProxyKeyFactory,
     private openpgp: any
   ) {}
+
+  private static PUBLIC_METHODS = [
+    'configure',
+    'generateKey',
+    'getKeysFromArmor',
+    'getArmorFromKey',
+    'unlock',
+    'lock',
+    'encrypt',
+    'decrypt',
+    'sign',
+    'verify'
+  ]
 
   /**
    * @private
@@ -563,7 +685,7 @@ function getHandle (keyRef: KeyRef): string|false {
 /**
  * default settings for `openpgp.config`
  */
-const OPENPGP_CONFIG_DEFAULTS = {
+const OPENPGP_CONFIG_DEFAULTS = <OpenpgpConfig> {
   aead_protect: true
 }
 
@@ -572,22 +694,93 @@ const OPENPGP_CONFIG_DEFAULTS = {
  * @function
  *
  * @param {*=} config
+ * an openpgp configuration object or a configured openpgp instance
  *
  * @returns {*}
- * * the given `config` object, when it is an `openpgp` instance  ,
- * * otherwise a new `openpgp` instance,
+ * * the given `config` object, when it is an `openpgp` instance,
+ * * otherwise the default `openpgp` instance,
  * configured with the `config` object assigned to `openpgp.config`,
  * or [default settings]{@link OPENPGP_CONFIG_DEFAULTS}.
  */
 function getOpenpgp (config?: any): any {
   if (isOpenpgp(config)) { return config }
-  assign(openpgp.config, OPENPGP_CONFIG_DEFAULTS, config)
-  return openpgp
+  return configureOpenpgp(openpgp, OPENPGP_CONFIG_DEFAULTS, config)
 }
 
 function isOpenpgp (val: any): boolean {
-  return !!val && [ 'crypto', 'key', 'message' ]
+  return !!val && [ 'config', 'crypto', 'key', 'message' ]
   .every(prop => !!val[prop])
+  && [
+    val.crypto.encrypt, val.crypto.decrypt,
+    val.crypto.hash && val.crypto.hash.sha256,
+    val.key.readArmored, val.key.generateKey,
+    val.message.fromText, val.message.readArmored
+  ].every(fun => isFunction(fun))
+}
+
+/**
+ * @private
+ * @function
+ *
+ * @description
+ * assign properties of a given {OpenpgpConfig} objects onto `openpgp.config`.
+ * only valid properties of the given objects are assigned to `openpgp.config`.
+ * as with `Object.assign`, valid properties of later objects
+ * overwrite earlier ones.
+ *
+ * @param {*} openpgp
+ *
+ * @param {...OpenpgpConfig[]=} configs
+ *
+ * @return {openpgp} the given `openpgp` instance,
+ * configured with the given {OpenpgpConfig} objects.
+ */
+function configureOpenpgp (openpgp: any, ...configs: OpenpgpConfig[]): any {
+  const args = [ openpgp.config ].concat(configs.map(toValidOpenpgpConfig))
+  assign.apply(Object, args)
+  return openpgp
+}
+
+const OPENPGP_CONFIG_INTERFACE = {
+  'prefer_hash_algorithm': isNumber,
+  'encryption_cipher': isNumber,
+  'compression': isNumber,
+  'aead_protect': isBoolean,
+  'integrity_protect': isBoolean,
+  'ignore_mdc_error': isBoolean,
+  'rsa_blinding': isBoolean,
+  'use_native': isBoolean,
+  'zero_copy': isBoolean,
+  'debug': isBoolean,
+  'show_version': isBoolean,
+  'show_comment': isBoolean,
+  'versionstring': isString,
+  'commentstring': isString,
+  'keyserver': isString,
+  'node_store': isString
+}
+
+const OPENPGP_CONFIG_KEYS = Object.keys(OPENPGP_CONFIG_INTERFACE)
+
+/**
+ * @private
+ * @function
+ *
+ * @param {*} val
+ *
+ * @returns {OpenpgpConfig} including only valid openpgp configuration entries
+ * from `val`, if any.
+ */
+function toValidOpenpgpConfig (val: any): OpenpgpConfig {
+  return Object.keys(val || {})
+  .reduce((config, key) => {
+    const isValid: (val: any) => boolean = OPENPGP_CONFIG_INTERFACE[key]
+    if (!isValid) { return config } // key not known
+    const value = val[key]
+    if (!isValid(value)) { return config } // invalid value type
+    config[key] = value
+    return config
+  }, <OpenpgpConfig>{})
 }
 
 const getOpgpService = OpgpServiceClass.getInstance

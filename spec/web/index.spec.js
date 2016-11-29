@@ -337,7 +337,10 @@ var Promise = require("bluebird");
         var opgpService;
         beforeEach(function () {
             opgpService = jasmine.objectContaining({
+                configure: jasmine.any(Function),
+                generateKey: jasmine.any(Function),
                 getKeysFromArmor: jasmine.any(Function),
+                getArmorFromKey: jasmine.any(Function),
                 encrypt: jasmine.any(Function),
                 decrypt: jasmine.any(Function),
                 sign: jasmine.any(Function),
@@ -381,21 +384,18 @@ var Promise = require("bluebird");
             });
         });
         describe('when called with { openpgp?: config } ' +
-            'where config is a configuration object for `openpgp.config`', function () {
+            'where config is a valid configuration object for `openpgp.config`', function () {
             beforeEach(function () {
                 openpgp.config = {};
             });
             beforeEach(function () {
-                debugger;
                 getService({
-                    openpgp: {
-                        foo: 'foo'
-                    }
+                    openpgp: { debug: true }
                 });
             });
             it('returns an {OpgpService} instance based on an openpgp instance ' +
                 'with the given configuration', function () {
-                expect(openpgp.config).toEqual(jasmine.objectContaining({ foo: 'foo' }));
+                expect(openpgp.config).toEqual(jasmine.objectContaining({ debug: true }));
             });
         });
     });
@@ -406,6 +406,55 @@ var Promise = require("bluebird");
                 cache: cache,
                 getLiveKey: getLiveKey,
                 openpgp: openpgp
+            });
+        });
+        describe('configure (config?: OpenpgpConfig): Promise<OpenpgpConfig>', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                openpgp.config = {
+                    debug: false,
+                    use_native: false
+                };
+            });
+            describe('when called without config argument', function () {
+                beforeEach(function (done) {
+                    service.configure()
+                        .then(function (res) { return result = res; })
+                        .catch(function (err) { return error = err; })
+                        .finally(function () { return setTimeout(done); });
+                });
+                it('returns a Promise that resolves to the current openpgp configuration', function () {
+                    expect(error).not.toBeDefined();
+                    expect(result).toEqual(openpgp.config);
+                });
+            });
+            describe('when called with an openpgp configuration object', function () {
+                var config;
+                beforeEach(function () {
+                    config = {
+                        compression: 42,
+                        debug: true,
+                        versionstring: 'test-version',
+                        use_native: 'true',
+                        foo: 'foo'
+                    };
+                });
+                beforeEach(function (done) {
+                    service.configure(config)
+                        .then(function (res) { return result = res; })
+                        .catch(function (err) { return error = err; })
+                        .finally(function () { return setTimeout(done); });
+                });
+                it('returns a Promise that resolves to the current openpgp configuration', function () {
+                    expect(error).not.toBeDefined();
+                    expect(result).toEqual({
+                        compression: 42,
+                        debug: true,
+                        use_native: false,
+                        versionstring: 'test-version'
+                    });
+                });
             });
         });
         describe('generateKey (passphrase: string, opts?: OpgpKeyOpts)' +
@@ -1819,6 +1868,10 @@ var OpgpServiceClass = (function () {
         this.getProxyKey = getProxyKey;
         this.openpgp = openpgp;
     }
+    OpgpServiceClass.prototype.configure = function (config) {
+        var openpgp = configureOpenpgp(this.openpgp, config);
+        return Promise.resolve(tslib_1.__assign({}, openpgp.config));
+    };
     OpgpServiceClass.prototype.generateKey = function (passphrase, opts) {
         var _this = this;
         return !utils_1.isString(passphrase) ? reject('invalid passphrase: not a string')
@@ -1954,22 +2007,23 @@ OpgpServiceClass.getInstance = function (config) {
     var openpgp = getOpenpgp(spec.openpgp);
     var getLiveKey = spec.getLiveKey || live_key_1.default({ openpgp: openpgp });
     var instance = new OpgpServiceClass(cache, getLiveKey, spec.getProxyKey || proxy_key_1.default, openpgp);
-    var service = {};
-    return [
-        'generateKey',
-        'getKeysFromArmor',
-        'getArmorFromKey',
-        'unlock',
-        'lock',
-        'encrypt',
-        'decrypt',
-        'sign',
-        'verify'
-    ].reduce(function (service, key) {
-        service[key] = instance[key].bind(instance);
+    return OpgpServiceClass.PUBLIC_METHODS.reduce(function (service, method) {
+        service[method] = instance[method].bind(instance);
         return service;
-    }, service);
+    }, {});
 };
+OpgpServiceClass.PUBLIC_METHODS = [
+    'configure',
+    'generateKey',
+    'getKeysFromArmor',
+    'getArmorFromKey',
+    'unlock',
+    'lock',
+    'encrypt',
+    'decrypt',
+    'sign',
+    'verify'
+];
 function reject(reason) {
     return Promise.reject(new Error(reason));
 }
@@ -1984,12 +2038,60 @@ function getOpenpgp(config) {
     if (isOpenpgp(config)) {
         return config;
     }
-    tslib_1.__assign(openpgp.config, OPENPGP_CONFIG_DEFAULTS, config);
-    return openpgp;
+    return configureOpenpgp(openpgp, OPENPGP_CONFIG_DEFAULTS, config);
 }
 function isOpenpgp(val) {
-    return !!val && ['crypto', 'key', 'message']
-        .every(function (prop) { return !!val[prop]; });
+    return !!val && ['config', 'crypto', 'key', 'message']
+        .every(function (prop) { return !!val[prop]; })
+        && [
+            val.crypto.encrypt, val.crypto.decrypt,
+            val.crypto.hash && val.crypto.hash.sha256,
+            val.key.readArmored, val.key.generateKey,
+            val.message.fromText, val.message.readArmored
+        ].every(function (fun) { return utils_1.isFunction(fun); });
+}
+function configureOpenpgp(openpgp) {
+    var configs = [];
+    for (var _i = 1; _i < arguments.length; _i++) {
+        configs[_i - 1] = arguments[_i];
+    }
+    var args = [openpgp.config].concat(configs.map(toValidOpenpgpConfig));
+    tslib_1.__assign.apply(Object, args);
+    return openpgp;
+}
+var OPENPGP_CONFIG_INTERFACE = {
+    'prefer_hash_algorithm': utils_1.isNumber,
+    'encryption_cipher': utils_1.isNumber,
+    'compression': utils_1.isNumber,
+    'aead_protect': utils_1.isBoolean,
+    'integrity_protect': utils_1.isBoolean,
+    'ignore_mdc_error': utils_1.isBoolean,
+    'rsa_blinding': utils_1.isBoolean,
+    'use_native': utils_1.isBoolean,
+    'zero_copy': utils_1.isBoolean,
+    'debug': utils_1.isBoolean,
+    'show_version': utils_1.isBoolean,
+    'show_comment': utils_1.isBoolean,
+    'versionstring': utils_1.isString,
+    'commentstring': utils_1.isString,
+    'keyserver': utils_1.isString,
+    'node_store': utils_1.isString
+};
+var OPENPGP_CONFIG_KEYS = Object.keys(OPENPGP_CONFIG_INTERFACE);
+function toValidOpenpgpConfig(val) {
+    return Object.keys(val || {})
+        .reduce(function (config, key) {
+        var isValid = OPENPGP_CONFIG_INTERFACE[key];
+        if (!isValid) {
+            return config;
+        }
+        var value = val[key];
+        if (!isValid(value)) {
+            return config;
+        }
+        config[key] = value;
+        return config;
+    }, {});
 }
 var getOpgpService = OpgpServiceClass.getInstance;
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -2145,5 +2247,17 @@ function isString(val) {
     return typeof (val && val.valueOf()) === 'string';
 }
 exports.isString = isString;
+function isNumber(val) {
+    return typeof (val && val.valueOf()) === 'number';
+}
+exports.isNumber = isNumber;
+function isBoolean(val) {
+    return typeof (val && val.valueOf()) === 'boolean';
+}
+exports.isBoolean = isBoolean;
+function isFunction(val) {
+    return typeof val === 'function';
+}
+exports.isFunction = isFunction;
 
 },{}]},{},[6,7]);

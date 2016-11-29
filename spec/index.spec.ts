@@ -59,6 +59,7 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
   let opgpService: any
   beforeEach(() => {
     opgpService = jasmine.objectContaining({
+      configure: jasmine.any(Function),
       generateKey: jasmine.any(Function),
       getKeysFromArmor: jasmine.any(Function),
       getArmorFromKey: jasmine.any(Function),
@@ -111,23 +112,20 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
   })
 
   describe('when called with { openpgp?: config } ' +
-  'where config is a configuration object for `openpgp.config`', () => {
+  'where config is a valid configuration object for `openpgp.config`', () => {
     beforeEach(() => {
       openpgp.config = {}
     })
 
     beforeEach(() => {
-      debugger
       getService({
-        openpgp: {
-          foo: 'foo'
-        }
+        openpgp: { debug: true }
       })
     })
 
     it('returns an {OpgpService} instance based on an openpgp instance ' +
     'with the given configuration', () =>{
-      expect(openpgp.config).toEqual(jasmine.objectContaining({ foo: 'foo' }))
+      expect(openpgp.config).toEqual(jasmine.objectContaining({ debug: true }))
     })
   })
 })
@@ -140,6 +138,56 @@ describe('OpgpService', () => {
       getLiveKey: getLiveKey, // unit-tested separately
       // default getProxyKey
       openpgp: openpgp
+    })
+  })
+
+  describe('configure (config?: OpenpgpConfig): Promise<OpenpgpConfig>', () => {
+    let error: any
+    let result: any
+    beforeEach(() => {
+      openpgp.config = {
+        debug: false,
+        use_native: false
+      }
+    })
+    describe('when called without config argument', () => {
+      beforeEach((done) => {
+        service.configure()
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+      it('returns a Promise that resolves to the current openpgp configuration', () => {
+        expect(error).not.toBeDefined()
+        expect(result).toEqual(openpgp.config)
+      })
+    })
+    describe('when called with an openpgp configuration object', () => {
+      let config: any
+      beforeEach(() => {
+        config = {
+          compression: 42, // number
+          debug: true, // boolean, overwrite default
+          versionstring: 'test-version', // string
+          use_native: 'true', // known configuration key, wrong type
+          foo: 'foo' // unknown configuration key
+        }
+      })
+      beforeEach((done) => {
+        service.configure(config)
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+      it('returns a Promise that resolves to the current openpgp configuration', () => {
+        expect(error).not.toBeDefined()
+        expect(result).toEqual({
+          compression: 42,
+          debug: true,
+          use_native: false,
+          versionstring: 'test-version'
+        })
+      })
     })
   })
 
