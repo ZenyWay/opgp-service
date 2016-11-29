@@ -59,7 +59,9 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
   let opgpService: any
   beforeEach(() => {
     opgpService = jasmine.objectContaining({
+      generateKey: jasmine.any(Function),
       getKeysFromArmor: jasmine.any(Function),
+      getArmorFromKey: jasmine.any(Function),
       encrypt: jasmine.any(Function),
       decrypt: jasmine.any(Function),
       sign: jasmine.any(Function),
