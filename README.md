@@ -51,13 +51,13 @@ the current version exposes the following service methods:
 * sign, verify
 
 for a detailed specification of the API
-* run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.3.0/spec/web/index.html)
+* run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.3.1/spec/web/index.html)
 in your browser,
 * or check the [public interface declaration](https://github.com/ZenyWay/opgp-service/blob/master/src/index.ts#L22-L234)
 in the source code.
 
 # <a name="example"></a> EXAMPLE
-a live version of this example can be viewed [here](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.3.0/spec/example/index.html)
+a live version of this example can be viewed [here](https://cdn.rawgit.com/ZenyWay/opgp-service/v1.3.1/spec/example/index.html)
 in the browser console,
 or by cloning this repository and running the following commands from a terminal:
 ```bash

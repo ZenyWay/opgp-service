@@ -12,13 +12,9 @@
  * Limitations under the License.
  */
 ;
+import getService from '../src'
 import Promise = require('bluebird')
 
-(function () { // workaround for https://github.com/smcatala/proxyquire-strict-mode-issue
-'use strict'
-const proxyquire = require('proxyquire')
-
-let getService: any
 let cache: any
 let getLiveKey: any
 let getProxyKey: any
@@ -47,13 +43,6 @@ beforeEach(() => { // mock dependencies
   }
 })
 
-beforeEach(() => {
-  getService = proxyquire('../src/index.ts', {
-    'openpgp': openpgp,
-    '@noCallThru': true
-  }).default
-})
-
 describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' +
 'OpgpService', () => {
   let opgpService: any
@@ -73,7 +62,6 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
   describe('when called without arguments', () => {
     let service: any
     beforeEach(() => {
-      debugger
       service = getService()
     })
 
@@ -113,19 +101,23 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
 
   describe('when called with { openpgp?: config } ' +
   'where config is a valid configuration object for `openpgp.config`', () => {
-    beforeEach(() => {
-      openpgp.config = {}
-    })
+    let error: any
+    let result: any
 
-    beforeEach(() => {
-      getService({
+    beforeEach((done) => {
+      const service = getService({
         openpgp: { debug: true }
       })
+      service.configure()
+      .then((res: any) => result = res)
+      .catch((err: any) => error = err)
+      .finally(() => setTimeout(done))
     })
 
     it('returns an {OpgpService} instance based on an openpgp instance ' +
     'with the given configuration', () =>{
-      expect(openpgp.config).toEqual(jasmine.objectContaining({ debug: true }))
+      expect(error).not.toBeDefined()
+      expect(result).toEqual(jasmine.objectContaining({ debug: true }))
     })
   })
 })
@@ -1438,4 +1430,3 @@ function getInvalidAuthArgs () {
   .concat(nonStringTypes
     .map((invalidText: any) => [ 'compliant handle', invalidText ]))
 }
-}())

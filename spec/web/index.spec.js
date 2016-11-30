@@ -1,1517 +1,1216 @@
-// modules are defined as an array
-// [ module function, map of requireuires ]
-//
-// map of requireuires is short require name -> numeric require
-//
-// anything defined in a previous bundle is accessed via the
-// orig method which is the requireuire for previous bundles
-
-(function outer (modules, cache, entry) {
-    // Save the require from previous bundle to this closure if any
-    var previousRequire = typeof require == "function" && require;
-
-    function findProxyquireifyName() {
-        var deps = Object.keys(modules)
-            .map(function (k) { return modules[k][1]; });
-
-        for (var i = 0; i < deps.length; i++) {
-            var pq = deps[i]['proxyquireify'];
-            if (pq) return pq;
-        }
-    }
-
-    var proxyquireifyName = findProxyquireifyName();
-
-    function newRequire(name, jumped){
-        // Find the proxyquireify module, if present
-        var pqify = (proxyquireifyName != null) && cache[proxyquireifyName];
-
-        // Proxyquireify provides a separate cache that is used when inside
-        // a proxyquire call, and is set to null outside a proxyquire call.
-        // This allows the regular caching semantics to work correctly both
-        // inside and outside proxyquire calls while keeping the cached
-        // modules isolated.
-        // When switching from one proxyquire call to another, it clears
-        // the cache to prevent contamination between different sets
-        // of stubs.
-        var currentCache = (pqify && pqify.exports._cache) || cache;
-
-        if(!currentCache[name]) {
-            if(!modules[name]) {
-                // if we cannot find the the module within our internal map or
-                // cache jump to the current global require ie. the last bundle
-                // that was added to the page.
-                var currentRequire = typeof require == "function" && require;
-                if (!jumped && currentRequire) return currentRequire(name, true);
-
-                // If there are other bundles on this page the require from the
-                // previous one is saved to 'previousRequire'. Repeat this as
-                // many times as there are bundles until the module is found or
-                // we exhaust the require chain.
-                if (previousRequire) return previousRequire(name, true);
-                var err = new Error('Cannot find module \'' + name + '\'');
-                err.code = 'MODULE_NOT_FOUND';
-                throw err;
-            }
-            var m = currentCache[name] = {exports:{}};
-
-            // The normal browserify require function
-            var req = function(x){
-                var id = modules[name][1][x];
-                return newRequire(id ? id : x);
-            };
-
-            // The require function substituted for proxyquireify
-            var moduleRequire = function(x){
-                var pqify = (proxyquireifyName != null) && cache[proxyquireifyName];
-                // Only try to use the proxyquireify version if it has been `require`d
-                if (pqify && pqify.exports._proxy) {
-                    return pqify.exports._proxy(req, x);
-                } else {
-                    return req(x);
-                }
-            };
-
-            modules[name][0].call(m.exports,moduleRequire,m,m.exports,outer,modules,currentCache,entry);
-        }
-        return currentCache[name].exports;
-    }
-    for(var i=0;i<entry.length;i++) newRequire(entry[i]);
-
-    // Override the current require with this new one
-    return newRequire;
-})
-({1:[function(require,module,exports){
-'use strict'
-
-var mergeDescriptors = require('merge-descriptors')
-var isObject = require('is-object')
-var hasOwnProperty = Object.prototype.hasOwnProperty
-
-function fill (destination, source, merge) {
-  if (destination && (isObject(source) || isFunction(source))) {
-    merge(destination, source, false)
-    if (isFunction(destination) && isFunction(source) && source.prototype) {
-      merge(destination.prototype, source.prototype, false)
-    }
-  }
-  return destination
-}
-
-exports = module.exports = function fillKeys (destination, source) {
-  return fill(destination, source, mergeDescriptors)
-}
-
-exports.es3 = function fillKeysEs3 (destination, source) {
-  return fill(destination, source, es3Merge)
-}
-
-function es3Merge (destination, source) {
-  for (var key in source) {
-    if (!hasOwnProperty.call(destination, key)) {
-      destination[key] = source[key]
-    }
-  }
-  return destination
-}
-
-function isFunction (value) {
-  return typeof value === 'function'
-}
-
-},{"is-object":2,"merge-descriptors":3}],2:[function(require,module,exports){
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 "use strict";
-
-module.exports = function isObject(x) {
-	return typeof x === "object" && x !== null;
-};
-
-},{}],3:[function(require,module,exports){
-/*!
- * merge-descriptors
- * Copyright(c) 2014 Jonathan Ong
- * Copyright(c) 2015 Douglas Christopher Wilson
- * MIT Licensed
- */
-
-'use strict'
-
-/**
- * Module exports.
- * @public
- */
-
-module.exports = merge
-
-/**
- * Module variables.
- * @private
- */
-
-var hasOwnProperty = Object.prototype.hasOwnProperty
-
-/**
- * Merge the property descriptors of `src` into `dest`
- *
- * @param {object} dest Object to add descriptors to
- * @param {object} src Object to clone descriptors from
- * @param {boolean} [redefine=true] Redefine `dest` properties with `src` properties
- * @returns {object} Reference to dest
- * @public
- */
-
-function merge(dest, src, redefine) {
-  if (!dest) {
-    throw new TypeError('argument dest is required')
-  }
-
-  if (!src) {
-    throw new TypeError('argument src is required')
-  }
-
-  if (redefine === undefined) {
-    // Default to true
-    redefine = true
-  }
-
-  Object.getOwnPropertyNames(src).forEach(function forEachOwnPropertyName(name) {
-    if (!redefine && hasOwnProperty.call(dest, name)) {
-      // Skip desriptor
-      return
-    }
-
-    // Copy descriptor
-    var descriptor = Object.getOwnPropertyDescriptor(src, name)
-    Object.defineProperty(dest, name, descriptor)
-  })
-
-  return dest
-}
-
-},{}],4:[function(require,module,exports){
-'use strict'
-
-module.exports = function createNotFoundError (path) {
-  var err = new Error('Cannot find module \'' + path + '\'')
-  err.code = 'MODULE_NOT_FOUND'
-  return err
-}
-
-},{}],5:[function(require,module,exports){
-'use strict';
-
-var fillMissingKeys = require('fill-keys');
-var moduleNotFoundError = require('module-not-found-error');
-
-function ProxyquireifyError(msg) {
-  this.name = 'ProxyquireifyError';
-  Error.captureStackTrace(this, ProxyquireifyError);
-  this.message = msg || 'An error occurred inside proxyquireify.';
-}
-
-function validateArguments(request, stubs) {
-  var msg = (function getMessage() {
-    if (!request)
-      return 'Missing argument: "request". Need it to resolve desired module.';
-
-    if (!stubs)
-      return 'Missing argument: "stubs". If no stubbing is needed, use regular require instead.';
-
-    if (typeof request != 'string')
-      return 'Invalid argument: "request". Needs to be a requirable string that is the module to load.';
-
-    if (typeof stubs != 'object')
-      return 'Invalid argument: "stubs". Needs to be an object containing overrides e.g., {"path": { extname: function () { ... } } }.';
-  })();
-
-  if (msg) throw new ProxyquireifyError(msg);
-}
-
-var stubs;
-
-function stub(stubs_) {
-  stubs = stubs_;
-  // This cache is used by the prelude as an alternative to the regular cache.
-  // It is not read or written here, except to set it to an empty object when
-  // adding stubs and to reset it to null when clearing stubs.
-  module.exports._cache = {};
-}
-
-function reset() {
-  stubs = undefined;
-  module.exports._cache = null;
-}
-
-var proxyquire = module.exports = function (require_) {
-  if (typeof require_ != 'function')
-    throw new ProxyquireifyError(
-        'It seems like you didn\'t initialize proxyquireify with the require in your test.\n'
-      + 'Make sure to correct this, i.e.: "var proxyquire = require(\'proxyquireify\')(require);"'
-    );
-
-  reset();
-
-  return function(request, stubs) {
-
-    validateArguments(request, stubs);
-
-    // set the stubs and require dependency
-    // when stub require is invoked by the module under test it will find the stubs here
-    stub(stubs);
-    var dep = require_(request);
-    reset();
-
-    return dep;
-  };
-};
-
-// Start with the default cache
-proxyquire._cache = null;
-
-proxyquire._proxy = function (require_, request) {
-  function original() {
-    return require_(request);
-  }
-
-  if (!stubs || !stubs.hasOwnProperty(request)) return original();
-
-  var stub = stubs[request];
-
-  if (stub === null) throw moduleNotFoundError(request)
-
-  var stubWideNoCallThru = Boolean(stubs['@noCallThru']) && (stub == null || stub['@noCallThru'] !== false);
-  var noCallThru = stubWideNoCallThru || (stub != null && Boolean(stub['@noCallThru']));
-  return noCallThru ? stub : fillMissingKeys(stub, original());
-};
-
-if (require.cache) {
-  // only used during build, so prevent browserify from including it
-  var replacePreludePath = './lib/replace-prelude';
-  var replacePrelude = require(replacePreludePath);
-  proxyquire.browserify = replacePrelude.browserify;
-  proxyquire.plugin = replacePrelude.plugin;
-}
-
-},{"fill-keys":1,"module-not-found-error":4}],6:[function(require,module,exports){
-/* proxyquireify injected requires to make browserify include dependencies in the bundle */ /* istanbul ignore next */; (function __makeBrowserifyIncludeModule__() { require('../src/index.ts');});"use strict";
 ;
+var src_1 = require("../src");
 var Promise = require("bluebird");
-(function () {
-    'use strict';
-    var proxyquire = require('proxyquireify')(require);
-    var getService;
-    var cache;
-    var getLiveKey;
-    var getProxyKey;
-    var openpgp;
-    var livekey;
-    var types;
+var cache;
+var getLiveKey;
+var getProxyKey;
+var openpgp;
+var livekey;
+var types;
+beforeEach(function () {
+    cache = jasmine.createSpyObj('cache', ['set', 'del', 'get', 'has']);
+    getLiveKey = jasmine.createSpy('getLiveKey');
+    getProxyKey = jasmine.createSpy('getProxyKey');
+    openpgp = {
+        config: {},
+        crypto: { hash: jasmine.createSpyObj('hash', ['sha256']) },
+        key: jasmine.createSpyObj('key', ['readArmored', 'generateKey']),
+        message: jasmine.createSpyObj('message', ['fromText', 'readArmored']),
+        encrypt: jasmine.createSpy('encrypt'),
+        decrypt: jasmine.createSpy('decrypt')
+    };
+    livekey = {
+        key: {},
+        bp: { keys: [{ id: 'key-id' }], user: { ids: [] } },
+        armor: jasmine.createSpy('armor'),
+        lock: jasmine.createSpy('lock'),
+        unlock: jasmine.createSpy('unlock')
+    };
+});
+describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' +
+    'OpgpService', function () {
+    var opgpService;
     beforeEach(function () {
-        cache = jasmine.createSpyObj('cache', ['set', 'del', 'get', 'has']);
-        getLiveKey = jasmine.createSpy('getLiveKey');
-        getProxyKey = jasmine.createSpy('getProxyKey');
-        openpgp = {
-            config: {},
-            crypto: { hash: jasmine.createSpyObj('hash', ['sha256']) },
-            key: jasmine.createSpyObj('key', ['readArmored', 'generateKey']),
-            message: jasmine.createSpyObj('message', ['fromText', 'readArmored']),
-            encrypt: jasmine.createSpy('encrypt'),
-            decrypt: jasmine.createSpy('decrypt')
-        };
-        livekey = {
-            key: {},
-            bp: { keys: [{ id: 'key-id' }], user: { ids: [] } },
-            armor: jasmine.createSpy('armor'),
-            lock: jasmine.createSpy('lock'),
-            unlock: jasmine.createSpy('unlock')
-        };
+        opgpService = jasmine.objectContaining({
+            configure: jasmine.any(Function),
+            generateKey: jasmine.any(Function),
+            getKeysFromArmor: jasmine.any(Function),
+            getArmorFromKey: jasmine.any(Function),
+            encrypt: jasmine.any(Function),
+            decrypt: jasmine.any(Function),
+            sign: jasmine.any(Function),
+            verify: jasmine.any(Function)
+        });
     });
-    beforeEach(function () {
-        getService = proxyquire('../src/index.ts', {
-            'openpgp': openpgp,
-            '@noCallThru': true
-        }).default;
-    });
-    describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' +
-        'OpgpService', function () {
-        var opgpService;
+    describe('when called without arguments', function () {
+        var service;
         beforeEach(function () {
-            opgpService = jasmine.objectContaining({
-                configure: jasmine.any(Function),
-                generateKey: jasmine.any(Function),
-                getKeysFromArmor: jasmine.any(Function),
-                getArmorFromKey: jasmine.any(Function),
-                encrypt: jasmine.any(Function),
-                decrypt: jasmine.any(Function),
-                sign: jasmine.any(Function),
-                verify: jasmine.any(Function)
+            service = src_1.default();
+        });
+        it('returns an {OpgpService} instance', function () {
+            expect(service).toEqual(opgpService);
+        });
+    });
+    describe('when called with { cache?: CsrKeyCache<OpgpLiveKey>, ' +
+        'getLiveKey?: LiveKeyFactory, getProxyKey?: ProxyKeyFactory, ' +
+        'openpgp?: openpgp }', function () {
+        var service;
+        beforeEach(function () {
+            openpgp.key.readArmored.and.returnValue({ keys: [livekey.key] });
+            getLiveKey.and.returnValue(livekey);
+            cache.set.and.returnValue('key-handle');
+        });
+        beforeEach(function () {
+            service = src_1.default({
+                cache: cache,
+                getLiveKey: getLiveKey,
+                getProxyKey: getProxyKey,
+                openpgp: openpgp
+            });
+            service.getKeysFromArmor('key-armor');
+        });
+        it('returns an {OpgpService} instance based on the given dependencies ', function () {
+            expect(service).toEqual(opgpService);
+            expect(openpgp.key.readArmored).toHaveBeenCalledWith('key-armor');
+            expect(getLiveKey).toHaveBeenCalledWith(livekey.key);
+            expect(cache.set).toHaveBeenCalledWith(livekey);
+            expect(getProxyKey).toHaveBeenCalledWith('key-handle', livekey.bp);
+        });
+    });
+    describe('when called with { openpgp?: config } ' +
+        'where config is a valid configuration object for `openpgp.config`', function () {
+        var error;
+        var result;
+        beforeEach(function (done) {
+            var service = src_1.default({
+                openpgp: { debug: true }
+            });
+            service.configure()
+                .then(function (res) { return result = res; })
+                .catch(function (err) { return error = err; })
+                .finally(function () { return setTimeout(done); });
+        });
+        it('returns an {OpgpService} instance based on an openpgp instance ' +
+            'with the given configuration', function () {
+            expect(error).not.toBeDefined();
+            expect(result).toEqual(jasmine.objectContaining({ debug: true }));
+        });
+    });
+});
+describe('OpgpService', function () {
+    var service;
+    beforeEach(function () {
+        service = src_1.default({
+            cache: cache,
+            getLiveKey: getLiveKey,
+            openpgp: openpgp
+        });
+    });
+    describe('configure (config?: OpenpgpConfig): Promise<OpenpgpConfig>', function () {
+        var error;
+        var result;
+        beforeEach(function () {
+            openpgp.config = {
+                debug: false,
+                use_native: false
+            };
+        });
+        describe('when called without config argument', function () {
+            beforeEach(function (done) {
+                service.configure()
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('returns a Promise that resolves to the current openpgp configuration', function () {
+                expect(error).not.toBeDefined();
+                expect(result).toEqual(openpgp.config);
             });
         });
-        describe('when called without arguments', function () {
-            var service;
+        describe('when called with an openpgp configuration object', function () {
+            var config;
             beforeEach(function () {
-                debugger;
-                service = getService();
+                config = {
+                    compression: 42,
+                    debug: true,
+                    versionstring: 'test-version',
+                    use_native: 'true',
+                    foo: 'foo'
+                };
             });
-            it('returns an {OpgpService} instance', function () {
-                expect(service).toEqual(opgpService);
+            beforeEach(function (done) {
+                service.configure(config)
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('returns a Promise that resolves to the current openpgp configuration', function () {
+                expect(error).not.toBeDefined();
+                expect(result).toEqual({
+                    compression: 42,
+                    debug: true,
+                    use_native: false,
+                    versionstring: 'test-version'
+                });
             });
         });
-        describe('when called with { cache?: CsrKeyCache<OpgpLiveKey>, ' +
-            'getLiveKey?: LiveKeyFactory, getProxyKey?: ProxyKeyFactory, ' +
-            'openpgp?: openpgp }', function () {
-            var service;
+    });
+    describe('generateKey (passphrase: string, opts?: OpgpKeyOpts)' +
+        ': Promise<OpgpProxyKey>', function () {
+        it('delegates to the openpgp primitive', function (done) {
+            service.generateKey('secret passphrase')
+                .catch(function () { })
+                .finally(function () {
+                expect(openpgp.key.generateKey).toHaveBeenCalledWith(jasmine.objectContaining({
+                    passphrase: 'secret passphrase',
+                    numBits: 4096
+                }));
+                setTimeout(done);
+            });
+        });
+        describe('when the underlying openpgp primitive returns a newly generated key', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                openpgp.key.generateKey.and.returnValue(Promise.resolve(livekey.key));
+                getLiveKey.and.returnValue(livekey);
+                cache.set.and.returnValue('key-handle');
+            });
+            beforeEach(function (done) {
+                service.generateKey('secret passphrase')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('creates a new {OpgpLiveKey} instance from the new openpgp key', function () {
+                expect(getLiveKey).toHaveBeenCalledWith(livekey.key);
+            });
+            it('stores the new {OpgpLiveKey} instance in the underlying cache', function () {
+                expect(cache.set).toHaveBeenCalledWith(livekey);
+            });
+            it('returns a Promise that resolves to the new {OpgpProxyKey} instance', function () {
+                expect(result).toEqual(jasmine.objectContaining({ handle: 'key-handle' }));
+                expect(result).toEqual(jasmine.objectContaining(livekey.bp));
+                expect(error).not.toBeDefined();
+            });
+        });
+        describe('when the underlying openpgp primitive throws an error', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                openpgp.key.generateKey.and.throwError('boom');
+            });
+            beforeEach(function (done) {
+                service.generateKey('secret passphrase')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('returns a Promise that resolves to an {OpgpProxyKey} instance', function () {
+                expect(error).toBeDefined();
+                expect(error.message).toBe('boom');
+                expect(result).not.toBeDefined();
+            });
+        });
+        describe('OgpgKeyOpts', function () {
+        });
+    });
+    describe('getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)' +
+        ': Promise<OpgpProxyKey[]|OpgpProxyKey>', function () {
+        it('delegates to the openpgp primitive', function (done) {
+            service.getKeysFromArmor('key-armor')
+                .catch(function () { })
+                .finally(function () {
+                expect(openpgp.key.readArmored).toHaveBeenCalledWith('key-armor');
+                setTimeout(done);
+            });
+        });
+        describe('when the underlying openpgp primitive returns a single key', function () {
+            var error;
+            var result;
             beforeEach(function () {
                 openpgp.key.readArmored.and.returnValue({ keys: [livekey.key] });
                 getLiveKey.and.returnValue(livekey);
                 cache.set.and.returnValue('key-handle');
             });
-            beforeEach(function () {
-                service = getService({
-                    cache: cache,
-                    getLiveKey: getLiveKey,
-                    getProxyKey: getProxyKey,
-                    openpgp: openpgp
-                });
-                service.getKeysFromArmor('key-armor');
+            beforeEach(function (done) {
+                service.getKeysFromArmor('key-armor')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
             });
-            it('returns an {OpgpService} instance based on the given dependencies ', function () {
-                expect(service).toEqual(opgpService);
-                expect(openpgp.key.readArmored).toHaveBeenCalledWith('key-armor');
+            it('creates a new {OpgpLiveKey} instance from the openpgp key', function () {
                 expect(getLiveKey).toHaveBeenCalledWith(livekey.key);
+            });
+            it('stores the new {OpgpLiveKey} instance in the underlying cache', function () {
                 expect(cache.set).toHaveBeenCalledWith(livekey);
-                expect(getProxyKey).toHaveBeenCalledWith('key-handle', livekey.bp);
+            });
+            it('returns a Promise that resolves to a corresponding {OpgpProxyKey} instance', function () {
+                expect(result).toEqual(jasmine.objectContaining({ handle: 'key-handle' }));
+                expect(result).toEqual(jasmine.objectContaining(livekey.bp));
+                expect(error).not.toBeDefined();
             });
         });
-        describe('when called with { openpgp?: config } ' +
-            'where config is a valid configuration object for `openpgp.config`', function () {
-            beforeEach(function () {
-                openpgp.config = {};
-            });
-            beforeEach(function () {
-                getService({
-                    openpgp: { debug: true }
-                });
-            });
-            it('returns an {OpgpService} instance based on an openpgp instance ' +
-                'with the given configuration', function () {
-                expect(openpgp.config).toEqual(jasmine.objectContaining({ debug: true }));
-            });
-        });
-    });
-    describe('OpgpService', function () {
-        var service;
-        beforeEach(function () {
-            service = getService({
-                cache: cache,
-                getLiveKey: getLiveKey,
-                openpgp: openpgp
-            });
-        });
-        describe('configure (config?: OpenpgpConfig): Promise<OpenpgpConfig>', function () {
+        describe('when the underlying openpgp primitive returns multiple keys', function () {
             var error;
             var result;
             beforeEach(function () {
-                openpgp.config = {
-                    debug: false,
-                    use_native: false
-                };
+                openpgp.key.readArmored.and.returnValue({ keys: [livekey.key, livekey.key] });
+                getLiveKey.and.returnValue(livekey);
+                cache.set.and.returnValue('key-handle');
             });
-            describe('when called without config argument', function () {
-                beforeEach(function (done) {
-                    service.configure()
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('returns a Promise that resolves to the current openpgp configuration', function () {
-                    expect(error).not.toBeDefined();
-                    expect(result).toEqual(openpgp.config);
-                });
+            beforeEach(function (done) {
+                service.getKeysFromArmor('keys-armor')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
             });
-            describe('when called with an openpgp configuration object', function () {
-                var config;
-                beforeEach(function () {
-                    config = {
-                        compression: 42,
-                        debug: true,
-                        versionstring: 'test-version',
-                        use_native: 'true',
-                        foo: 'foo'
-                    };
+            it('creates new {OpgpLiveKey} instances from each openpgp key', function () {
+                expect(getLiveKey.calls.allArgs())
+                    .toEqual([[livekey.key], [livekey.key]]);
+            });
+            it('stores the new {OpgpLiveKey} instances in the underlying cache', function () {
+                expect(cache.set.calls.allArgs()).toEqual([[livekey], [livekey]]);
+            });
+            it('returns a Promise that resolves to corresponding {OpgpProxyKey} instances', function () {
+                expect(result).toEqual(jasmine.any(Array));
+                expect(result.length).toBe(2);
+                result.forEach(function (res) {
+                    expect(res).toEqual(jasmine.objectContaining({ handle: 'key-handle' }));
+                    expect(res).toEqual(jasmine.objectContaining(livekey.bp));
                 });
-                beforeEach(function (done) {
-                    service.configure(config)
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('returns a Promise that resolves to the current openpgp configuration', function () {
-                    expect(error).not.toBeDefined();
-                    expect(result).toEqual({
-                        compression: 42,
-                        debug: true,
-                        use_native: false,
-                        versionstring: 'test-version'
-                    });
-                });
+                expect(error).not.toBeDefined();
             });
         });
-        describe('generateKey (passphrase: string, opts?: OpgpKeyOpts)' +
-            ': Promise<OpgpProxyKey>', function () {
-            it('delegates to the openpgp primitive', function (done) {
-                service.generateKey('secret passphrase')
-                    .catch(function () { })
-                    .finally(function () {
-                    expect(openpgp.key.generateKey).toHaveBeenCalledWith(jasmine.objectContaining({
-                        passphrase: 'secret passphrase',
-                        numBits: 4096
-                    }));
-                    setTimeout(done);
-                });
+        describe('when the underlying openpgp primitive throws an error', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                openpgp.key.readArmored.and.throwError('boom');
             });
-            describe('when the underlying openpgp primitive returns a newly generated key', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    openpgp.key.generateKey.and.returnValue(Promise.resolve(livekey.key));
-                    getLiveKey.and.returnValue(livekey);
-                    cache.set.and.returnValue('key-handle');
-                });
-                beforeEach(function (done) {
-                    service.generateKey('secret passphrase')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('creates a new {OpgpLiveKey} instance from the new openpgp key', function () {
-                    expect(getLiveKey).toHaveBeenCalledWith(livekey.key);
-                });
-                it('stores the new {OpgpLiveKey} instance in the underlying cache', function () {
-                    expect(cache.set).toHaveBeenCalledWith(livekey);
-                });
-                it('returns a Promise that resolves to the new {OpgpProxyKey} instance', function () {
-                    expect(result).toEqual(jasmine.objectContaining({ handle: 'key-handle' }));
-                    expect(result).toEqual(jasmine.objectContaining(livekey.bp));
-                    expect(error).not.toBeDefined();
-                });
-            });
-            describe('when the underlying openpgp primitive throws an error', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    openpgp.key.generateKey.and.throwError('boom');
-                });
-                beforeEach(function (done) {
-                    service.generateKey('secret passphrase')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('returns a Promise that resolves to an {OpgpProxyKey} instance', function () {
-                    expect(error).toBeDefined();
-                    expect(error.message).toBe('boom');
-                    expect(result).not.toBeDefined();
-                });
-            });
-            describe('OgpgKeyOpts', function () {
-            });
-        });
-        describe('getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)' +
-            ': Promise<OpgpProxyKey[]|OpgpProxyKey>', function () {
-            it('delegates to the openpgp primitive', function (done) {
+            beforeEach(function (done) {
                 service.getKeysFromArmor('key-armor')
-                    .catch(function () { })
-                    .finally(function () {
-                    expect(openpgp.key.readArmored).toHaveBeenCalledWith('key-armor');
-                    setTimeout(done);
-                });
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
             });
-            describe('when the underlying openpgp primitive returns a single key', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    openpgp.key.readArmored.and.returnValue({ keys: [livekey.key] });
-                    getLiveKey.and.returnValue(livekey);
-                    cache.set.and.returnValue('key-handle');
-                });
-                beforeEach(function (done) {
-                    service.getKeysFromArmor('key-armor')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('creates a new {OpgpLiveKey} instance from the openpgp key', function () {
-                    expect(getLiveKey).toHaveBeenCalledWith(livekey.key);
-                });
-                it('stores the new {OpgpLiveKey} instance in the underlying cache', function () {
-                    expect(cache.set).toHaveBeenCalledWith(livekey);
-                });
-                it('returns a Promise that resolves to a corresponding {OpgpProxyKey} instance', function () {
-                    expect(result).toEqual(jasmine.objectContaining({ handle: 'key-handle' }));
-                    expect(result).toEqual(jasmine.objectContaining(livekey.bp));
-                    expect(error).not.toBeDefined();
-                });
-            });
-            describe('when the underlying openpgp primitive returns multiple keys', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    openpgp.key.readArmored.and.returnValue({ keys: [livekey.key, livekey.key] });
-                    getLiveKey.and.returnValue(livekey);
-                    cache.set.and.returnValue('key-handle');
-                });
-                beforeEach(function (done) {
-                    service.getKeysFromArmor('keys-armor')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('creates new {OpgpLiveKey} instances from each openpgp key', function () {
-                    expect(getLiveKey.calls.allArgs())
-                        .toEqual([[livekey.key], [livekey.key]]);
-                });
-                it('stores the new {OpgpLiveKey} instances in the underlying cache', function () {
-                    expect(cache.set.calls.allArgs()).toEqual([[livekey], [livekey]]);
-                });
-                it('returns a Promise that resolves to corresponding {OpgpProxyKey} instances', function () {
-                    expect(result).toEqual(jasmine.any(Array));
-                    expect(result.length).toBe(2);
-                    result.forEach(function (res) {
-                        expect(res).toEqual(jasmine.objectContaining({ handle: 'key-handle' }));
-                        expect(res).toEqual(jasmine.objectContaining(livekey.bp));
-                    });
-                    expect(error).not.toBeDefined();
-                });
-            });
-            describe('when the underlying openpgp primitive throws an error', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    openpgp.key.readArmored.and.throwError('boom');
-                });
-                beforeEach(function (done) {
-                    service.getKeysFromArmor('key-armor')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('returns a Promise that rejects with the thrown error', function () {
-                    expect(error).toBeDefined();
-                    expect(error.message).toBe('boom');
-                    expect(result).not.toBeDefined();
-                });
+            it('returns a Promise that rejects with the thrown error', function () {
+                expect(error).toBeDefined();
+                expect(error.message).toBe('boom');
+                expect(result).not.toBeDefined();
             });
         });
-        describe('getArmorFromKey (keyRef: KeyRef): Promise<string>', function () {
-            describe('when given a valid key handle string', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(livekey);
-                    livekey.armor.and.returnValue('armor');
-                });
-                beforeEach(function (done) {
-                    service.getArmorFromKey('valid-key-handle')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('valid-key-handle');
-                });
-                it('delegates to the retrieved {OpgpLiveKey} instance', function () {
-                    expect(livekey.armor).toHaveBeenCalledWith();
-                });
-                it('returns a Promise that resolves to an armored {string} representation ' +
-                    'of the referenced {OpgpLiveKey} instance', function () {
-                    expect(result).toEqual('armor');
-                    expect(error).not.toBeDefined();
-                });
-            });
-            describe('when given a stale or invalid handle', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(undefined);
-                });
-                beforeEach(function (done) {
-                    service.getArmorFromKey('stale-key-handle')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('attempts to retrieve the {OpgpLiveKey} instance ' +
-                    'referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('stale-key-handle');
-                });
-                it('returns a Promise that rejects ' +
-                    'with an `invalid key reference: not a string or stale` {Error}', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toEqual(jasmine.any(Error));
-                    expect(error.message).toBe('invalid key reference: not a string or stale');
-                });
-            });
-            describe('when the {OpgpLiveKey#armor} method rejects with an {Error}', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(livekey);
-                    livekey.armor.and.returnValue(Promise.reject(new Error('boom')));
-                });
-                beforeEach(function (done) {
-                    service.getArmorFromKey('valid-key-handle')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('valid-key-handle');
-                });
-                it('delegates to the retrieved {OpgpLiveKey} instance', function () {
-                    expect(livekey.armor).toHaveBeenCalledWith();
-                });
-                it('returns a Promise that rejects with the {Error} ' +
-                    'from the {OpgpLiveKey#armor} method', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toEqual(jasmine.any(Error));
-                    expect(error.message).toBe('boom');
-                });
-            });
-        });
-        describe('unlock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts)' +
-            ': Promise<OpgpProxyKey>', function () {
-            describe('when given a valid handle string of a locked key ' +
-                'and the correct passphrase', function () {
-                var unlockedLiveKey;
-                var error;
-                var result;
-                beforeEach(function () {
-                    livekey.bp.isLocked = true;
-                    unlockedLiveKey = {
-                        key: {},
-                        bp: { isLocked: false, keys: [{ id: 'key-id' }], user: { ids: [] } }
-                    };
-                    cache.get.and.returnValue(livekey);
-                    livekey.unlock.and.returnValue(Promise.resolve(unlockedLiveKey));
-                    cache.set.and.returnValue('unlocked-key-handle');
-                });
-                beforeEach(function (done) {
-                    service.unlock('valid-key-handle', 'secret passphrase')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('valid-key-handle');
-                });
-                it('delegates to the retrieved {OpgpLiveKey} instance', function () {
-                    expect(livekey.unlock).toHaveBeenCalledWith('secret passphrase');
-                });
-                it('stores the unlocked key in the underlying cache', function () {
-                    expect(cache.set).toHaveBeenCalledWith(unlockedLiveKey);
-                });
-                it('returns a Promise that resolves to an {OpgpProxyKey} instance ' +
-                    'of the unlocked {OpgpLiveKey} instance', function () {
-                    expect(result).toEqual(jasmine.objectContaining({ handle: 'unlocked-key-handle' }));
-                    expect(result).toEqual(jasmine.objectContaining(unlockedLiveKey.bp));
-                    expect(error).not.toBeDefined();
-                });
-            });
-            describe('when the referenced {OpgpLiveKey} instance is already unlocked', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    livekey.bp.isLocked = false;
-                    cache.get.and.returnValue(livekey);
-                    livekey.unlock.and.returnValue(Promise.reject(new Error('key not locked')));
-                });
-                beforeEach(function (done) {
-                    service.unlock('unlocked-key-handle', 'passphrase')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('unlocked-key-handle');
-                });
-                it('delegates to the retrieved {OpgpLiveKey} instance', function () {
-                    expect(livekey.unlock).toHaveBeenCalledWith('passphrase');
-                });
-                it('returns a Promise that rejects with a `key not locked` {Error} ' +
-                    'from the {OpgpLiveKey#unlock} method', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toEqual(jasmine.any(Error));
-                    expect(error.message).toBe('key not locked');
-                });
-            });
-            describe('when given a stale or invalid handle', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(undefined);
-                });
-                beforeEach(function (done) {
-                    service.unlock('stale-key-handle', 'passphrase')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('attempts to retrieve the {OpgpLiveKey} instance ' +
-                    'referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('stale-key-handle');
-                });
-                it('returns a Promise that rejects ' +
-                    'with an `invalid key reference: not a string or stale` {Error}', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toEqual(jasmine.any(Error));
-                    expect(error.message).toBe('invalid key reference: not a string or stale');
-                });
-            });
-            describe('when given an incorrect passphrase', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    livekey.bp.isLocked = true;
-                    cache.get.and.returnValue(livekey);
-                    livekey.unlock
-                        .and.returnValue(Promise.reject(new Error('fail to unlock key')));
-                });
-                beforeEach(function (done) {
-                    service.unlock('valid-key-handle', 'incorrect passphrase')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('valid-key-handle');
-                });
-                it('delegates to the retrieved {OpgpLiveKey} instance', function () {
-                    expect(livekey.unlock).toHaveBeenCalledWith('incorrect passphrase');
-                });
-                it('returns a Promise that rejects with a `fail to unlock key` {Error} ' +
-                    'from the {OpgpLiveKey#unlock} method', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toEqual(jasmine.any(Error));
-                    expect(error.message).toBe('fail to unlock key');
-                });
-            });
-            describe('when the {OpgpLiveKey#unlock} method rejects with an {Error}', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    livekey.bp.isLocked = true;
-                    cache.get.and.returnValue(livekey);
-                    livekey.unlock.and.returnValue(Promise.reject(new Error('boom')));
-                });
-                beforeEach(function (done) {
-                    service.unlock('valid-key-handle', 'passphrase')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('valid-key-handle');
-                });
-                it('delegates to the retrieved {OpgpLiveKey} instance', function () {
-                    expect(livekey.unlock).toHaveBeenCalledWith('passphrase');
-                });
-                it('returns a Promise that rejects with the {Error} ' +
-                    'from the {OpgpLiveKey#unlock} method', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toEqual(jasmine.any(Error));
-                    expect(error.message).toBe('boom');
-                });
-            });
-        });
-        describe('lock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts)' +
-            ': Promise<OpgpProxyKey>', function () {
-            describe('when given a valid handle string of an unlocked key '
-                + 'and a passphrase string', function () {
-                var lockedLiveKey;
-                var error;
-                var result;
-                beforeEach(function () {
-                    livekey.bp.isLocked = false;
-                    lockedLiveKey = {
-                        key: {},
-                        bp: { isLocked: true, keys: [{ id: 'key-id' }], user: { ids: [] } }
-                    };
-                    cache.get.and.returnValue(livekey);
-                    livekey.lock.and.returnValue(Promise.resolve(lockedLiveKey));
-                    cache.set.and.returnValue('locked-key-handle');
-                });
-                beforeEach(function (done) {
-                    service.lock('unlocked-key-handle', 'secret passphrase')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('unlocked-key-handle');
-                });
-                it('invalidates the original {OpgpLiveKey} from the cache', function () {
-                    expect(cache.del).toHaveBeenCalledWith('unlocked-key-handle');
-                });
-                it('delegates to the retrieved {OpgpLiveKey} instance', function () {
-                    expect(livekey.lock).toHaveBeenCalledWith('secret passphrase');
-                });
-                it('stores the unlocked key in the underlying cache', function () {
-                    expect(cache.set).toHaveBeenCalledWith(lockedLiveKey);
-                });
-                it('returns a Promise that resolves to an {OpgpProxyKey} instance ' +
-                    'of the locked {OpgpLiveKey} instance', function () {
-                    expect(result).toEqual(jasmine.objectContaining({ handle: 'locked-key-handle' }));
-                    expect(result).toEqual(jasmine.objectContaining(lockedLiveKey.bp));
-                    expect(error).not.toBeDefined();
-                });
-            });
-            describe('when the referenced {OpgpLiveKey} instance is already locked', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    livekey.bp.isLocked = true;
-                    cache.get.and.returnValue(livekey);
-                });
-                beforeEach(function (done) {
-                    service.lock('locked-key-handle', 'passphrase')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('locked-key-handle');
-                });
-                it('does not invalidate the original {OpgpLiveKey} from the cache', function () {
-                    expect(cache.del).not.toHaveBeenCalled();
-                });
-                it('does notdelegate to the retrieved {OpgpLiveKey} instance', function () {
-                    expect(livekey.lock).not.toHaveBeenCalled();
-                });
-                it('returns a Promise that rejects with a `key not unlocked` {Error} ' +
-                    'from the {OpgpLiveKey#lock} method', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toEqual(jasmine.any(Error));
-                    expect(error.message).toBe('key not unlocked');
-                });
-            });
-            describe('when given a stale or invalid handle', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(undefined);
-                });
-                beforeEach(function (done) {
-                    service.lock('stale-key-handle', 'secret passphrase')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('attempts to retrieve the {OpgpLiveKey} instance ' +
-                    'referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('stale-key-handle');
-                });
-                it('returns a Promise that rejects ' +
-                    'with an `invalid key reference: not a string or stale` {Error}', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toEqual(jasmine.any(Error));
-                    expect(error.message).toBe('invalid key reference: not a string or stale');
-                });
-            });
-            describe('when the {OpgpLiveKey#lock} method rejects with an {Error}', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(livekey);
-                    livekey.lock.and.returnValue(Promise.reject(new Error('boom')));
-                });
-                beforeEach(function (done) {
-                    service.lock('valid-key-handle', 'passphrase')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('valid-key-handle');
-                });
-                it('invalidates the original {OpgpLiveKey} from the cache', function () {
-                    expect(cache.del).toHaveBeenCalledWith('valid-key-handle');
-                });
-                it('delegates to the retrieved {OpgpLiveKey} instance', function () {
-                    expect(livekey.lock).toHaveBeenCalledWith('passphrase');
-                });
-                it('returns a Promise that rejects with the {Error} ' +
-                    'from the {OpgpLiveKey#lock} method', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toEqual(jasmine.any(Error));
-                    expect(error.message).toBe('boom');
-                });
-            });
-        });
-        describe('encrypt (keyRefs: KeyRefMap, plain: string, opts?: EncryptOpts)' +
-            ': Promise<string>', function () {
-            describe('when given a valid plain text string, and valid handles of valid ' +
-                'public cipher and private authentication keys', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    livekey.bp.isLocked = false;
-                    cache.get.and.returnValue(livekey);
-                    openpgp.encrypt.and.returnValue({ data: 'cipher text' });
-                });
-                beforeEach(function (done) {
-                    var refs = {
-                        cipher: 'valid-cipher-key-handle',
-                        auth: 'valid-auth-key-handle'
-                    };
-                    service.encrypt(refs, 'plain text')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instances ' +
-                    'referenced by the given handles when compliant', function () {
-                    expect(cache.get.calls.allArgs()).toEqual([
-                        ['valid-auth-key-handle'],
-                        ['valid-cipher-key-handle']
-                    ]);
-                });
-                it('delegates to the openpgp primitive', function () {
-                    expect(openpgp.encrypt)
-                        .toHaveBeenCalledWith(jasmine.objectContaining({
-                        data: 'plain text',
-                        publicKeys: [livekey.key],
-                        privateKeys: [livekey.key]
-                    }));
-                });
-                it('returns a Promise that resolves to an armor string ' +
-                    'of the given text string ' +
-                    'encrypted with the referenced cipher {OpgpLiveKey} instances and ' +
-                    'signed with the referenced authentication {OpgpLiveKey} instances ', function () {
-                    expect(result).toBe('cipher text');
-                    expect(error).not.toBeDefined();
-                });
-            });
-            describe('when given a valid plain text string and a stale handle string', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(undefined);
-                });
-                beforeEach(function (done) {
-                    var refs = {
-                        cipher: 'stale-key-handle',
-                        auth: 'stale-key-handle'
-                    };
-                    service.encrypt(refs, 'plain text')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('attempts to retrieve the {OpgpLiveKey} instance ' +
-                    'referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('stale-key-handle');
-                });
-                it('does not delegate to the openpgp primitive', function () {
-                    expect(openpgp.encrypt).not.toHaveBeenCalled();
-                });
-                it('returns a Promise that rejects ' +
-                    'with an `invalid key reference: not a string or stale` {Error}', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toBeDefined();
-                    expect(error.message).toBe('invalid key reference: not a string or stale');
-                });
-            });
-            describe('when given a valid plain text string, ' +
-                'and a valid handle string of a locked private key', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    livekey.bp.isLocked = true;
-                    cache.get.and.returnValue(livekey);
-                });
-                beforeEach(function (done) {
-                    var refs = {
-                        cipher: 'cipher-key-handle',
-                        auth: 'locked-auth-key-handle'
-                    };
-                    service.encrypt(refs, 'plain text')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('attempts to retrieve the {OpgpLiveKey} instance ' +
-                    'referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('locked-auth-key-handle');
-                });
-                it('does not delegate to the openpgp primitive', function () {
-                    expect(openpgp.encrypt).not.toHaveBeenCalled();
-                });
-                it('returns a Promise that rejects ' +
-                    'with an `private key not unlocked` {Error}', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toBeDefined();
-                    expect(error.message).toBe('private key not unlocked');
-                });
-            });
-            describe('when the underlying openpgp primitive rejects with an {Error}', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    livekey.bp.isLocked = false;
-                    cache.get.and.returnValue(livekey);
-                    openpgp.encrypt.and.returnValue(Promise.reject(new Error('boom')));
-                });
-                beforeEach(function (done) {
-                    var refs = {
-                        cipher: 'valid-cipher-key-handle',
-                        auth: 'valid-auth-key-handle'
-                    };
-                    service.encrypt(refs, 'plain text')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instances ' +
-                    'referenced by the given handles when compliant', function () {
-                    expect(cache.get.calls.allArgs()).toEqual([
-                        ['valid-auth-key-handle'],
-                        ['valid-cipher-key-handle']
-                    ]);
-                });
-                it('delegates to the openpgp primitive', function () {
-                    expect(openpgp.encrypt)
-                        .toHaveBeenCalledWith(jasmine.objectContaining({
-                        data: 'plain text',
-                        publicKeys: [livekey.key],
-                        privateKeys: [livekey.key]
-                    }));
-                });
-                it('returns a Promise that rejects with the {Error} ' +
-                    'from the openpgp primitive', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toEqual(jasmine.any(Error));
-                    expect(error.message).toBe('boom');
-                });
-            });
-        });
-        describe('decrypt (keyRefs: KeyRefMap, cipher: string, opts?: DecryptOpts)' +
-            ': Promise<string>', function () {
-            var message;
+    });
+    describe('getArmorFromKey (keyRef: KeyRef): Promise<string>', function () {
+        describe('when given a valid key handle string', function () {
+            var error;
+            var result;
             beforeEach(function () {
-                message = {};
+                cache.get.and.returnValue(livekey);
+                livekey.armor.and.returnValue('armor');
             });
-            describe('when given a valid cipher text string, and valid handles of valid ' +
-                'public authentication and a private cipher key', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    livekey.bp.isLocked = false;
-                    cache.get.and.returnValue(livekey);
-                    openpgp.message.readArmored.and.returnValue(message);
-                    openpgp.decrypt.and.returnValue({ data: 'plain text' });
-                });
-                beforeEach(function (done) {
-                    var refs = {
-                        cipher: 'valid-cipher-key-handle',
-                        auth: 'valid-auth-key-handle'
-                    };
-                    service.decrypt(refs, 'cipher text')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instances ' +
-                    'referenced by the given handles when compliant', function () {
-                    expect(cache.get.calls.allArgs()).toEqual([
-                        ['valid-cipher-key-handle'],
-                        ['valid-auth-key-handle']
-                    ]);
-                });
-                it('delegates to the openpgp primitive', function () {
-                    expect(openpgp.message.readArmored).toHaveBeenCalledWith('cipher text');
-                    expect(openpgp.decrypt)
-                        .toHaveBeenCalledWith(jasmine.objectContaining({
-                        message: message,
-                        publicKeys: [livekey.key],
-                        privateKey: livekey.key
-                    }));
-                });
-                it('returns a Promise that resolves to an armor string ' +
-                    'of the given text string ' +
-                    'decrypted with the referenced cipher {OpgpLiveKey} instance and ' +
-                    'authenticated with the referenced authentication {OpgpLiveKey} instances ', function () {
-                    expect(result).toBe('plain text');
-                    expect(error).not.toBeDefined();
-                });
+            beforeEach(function (done) {
+                service.getArmorFromKey('valid-key-handle')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
             });
-            describe('when given a valid plain text string and a stale handle string', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(undefined);
-                });
-                beforeEach(function (done) {
-                    var refs = {
-                        cipher: 'stale-key-handle',
-                        auth: 'stale-key-handle'
-                    };
-                    service.decrypt(refs, 'cipher text')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('attempts to retrieve the {OpgpLiveKey} instance ' +
-                    'referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('stale-key-handle');
-                });
-                it('does not delegate to the openpgp primitive', function () {
-                    expect(openpgp.message.readArmored).not.toHaveBeenCalled();
-                    expect(openpgp.decrypt).not.toHaveBeenCalled();
-                });
-                it('returns a Promise that rejects ' +
-                    'with an `invalid key reference: not a string or stale` {Error}', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toBeDefined();
-                    expect(error.message).toBe('invalid key reference: not a string or stale');
-                });
+            it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('valid-key-handle');
             });
-            describe('when given a valid plain text string, ' +
-                'and a valid handle string of a locked private key', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    livekey.bp.isLocked = true;
-                    cache.get.and.returnValue(livekey);
-                });
-                beforeEach(function (done) {
-                    var refs = {
-                        cipher: 'locked-cipher-key-handle',
-                        auth: 'auth-key-handle'
-                    };
-                    service.decrypt(refs, 'cipher text')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('attempts to retrieve the {OpgpLiveKey} instance ' +
-                    'referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('locked-cipher-key-handle');
-                });
-                it('does not delegate to the openpgp primitive', function () {
-                    expect(openpgp.message.readArmored).not.toHaveBeenCalled();
-                    expect(openpgp.decrypt).not.toHaveBeenCalled();
-                });
-                it('returns a Promise that rejects ' +
-                    'with an `private key not unlocked` {Error}', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toBeDefined();
-                    expect(error.message).toBe('private key not unlocked');
-                });
+            it('delegates to the retrieved {OpgpLiveKey} instance', function () {
+                expect(livekey.armor).toHaveBeenCalledWith();
             });
-            describe('when the underlying openpgp primitive rejects with an {Error}', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    livekey.bp.isLocked = false;
-                    cache.get.and.returnValue(livekey);
-                    openpgp.message.readArmored.and.returnValue(message);
-                    openpgp.decrypt.and.returnValue(Promise.reject(new Error('boom')));
-                });
-                beforeEach(function (done) {
-                    var refs = {
-                        cipher: 'valid-cipher-key-handle',
-                        auth: 'valid-auth-key-handle'
-                    };
-                    service.decrypt(refs, 'cipher text')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instances ' +
-                    'referenced by the given handles when compliant', function () {
-                    expect(cache.get.calls.allArgs()).toEqual([
-                        ['valid-cipher-key-handle'],
-                        ['valid-auth-key-handle']
-                    ]);
-                });
-                it('delegates to the openpgp primitive', function () {
-                    expect(openpgp.message.readArmored).toHaveBeenCalledWith('cipher text');
-                    expect(openpgp.decrypt)
-                        .toHaveBeenCalledWith(jasmine.objectContaining({
-                        message: message,
-                        publicKeys: [livekey.key],
-                        privateKey: livekey.key
-                    }));
-                });
-                it('returns a Promise that rejects with the {Error} ' +
-                    'from the openpgp primitive', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toEqual(jasmine.any(Error));
-                    expect(error.message).toBe('boom');
-                });
+            it('returns a Promise that resolves to an armored {string} representation ' +
+                'of the referenced {OpgpLiveKey} instance', function () {
+                expect(result).toEqual('armor');
+                expect(error).not.toBeDefined();
             });
         });
-        describe('sign (keyRefs: KeyRef[]|KeyRef, text: string, opts?: SignOpts)' +
-            ': Promise<string>', function () {
-            var message;
+        describe('when given a stale or invalid handle', function () {
+            var error;
+            var result;
             beforeEach(function () {
-                message = jasmine.createSpyObj('message', ['sign', 'armor']);
+                cache.get.and.returnValue(undefined);
             });
-            describe('when given a text string and a valid handle string that is not stale', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(livekey);
-                    openpgp.message.fromText.and.returnValue(message);
-                    message.sign.and.returnValue(message);
-                    message.armor.and.returnValue('signed-armor-text');
-                });
-                beforeEach(function (done) {
-                    service.sign('valid-key-handle', 'plain text')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('valid-key-handle');
-                });
-                it('delegates to the openpgp primitive', function () {
-                    expect(openpgp.message.fromText).toHaveBeenCalledWith('plain text');
-                    expect(message.sign).toHaveBeenCalledWith([livekey.key]);
-                    expect(message.armor).toHaveBeenCalledWith();
-                });
-                it('returns a Promise that resolves to an armor string ' +
-                    'of the given text string ' +
-                    'signed with the referenced {OpgpLiveKey} instance ', function () {
-                    expect(result).toBe('signed-armor-text');
-                    expect(error).not.toBeDefined();
-                });
+            beforeEach(function (done) {
+                service.getArmorFromKey('stale-key-handle')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
             });
-            describe('when given a text string and a stale handle string', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(undefined);
-                });
-                beforeEach(function (done) {
-                    service.sign('stale-key-handle', 'plain text')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('attempts to retrieve the {OpgpLiveKey} instance ' +
-                    'referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('stale-key-handle');
-                });
-                it('does not delegate to the openpgp primitive', function () {
-                    expect(openpgp.message.fromText).not.toHaveBeenCalled();
-                });
-                it('returns a Promise that rejects ' +
-                    'with an `invalid key reference: not a string or stale` {Error}', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toBeDefined();
-                    expect(error.message).toBe('invalid key reference: not a string or stale');
-                });
+            it('attempts to retrieve the {OpgpLiveKey} instance ' +
+                'referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('stale-key-handle');
             });
-            describe('when given non-compliant arguments', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(livekey);
-                });
-                beforeEach(function (done) {
-                    var args = getInvalidAuthArgs();
-                    Promise.any(args.map(function (args) { return service.sign.apply(service, args); }))
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('attempts to retrieve the {OpgpLiveKey} instances ' +
-                    'referenced by the given handles when compliant', function () {
-                    cache.get.calls.allArgs()
-                        .forEach(function (args) { return expect(args).toEqual(['compliant handle']); });
-                });
-                it('does not delegate to the openpgp primitive', function () {
-                    expect(openpgp.message.fromText).not.toHaveBeenCalled();
-                });
-                it('returns a Promise that rejects ' +
-                    'with an `invalid key reference: not a string or stale` or ' +
-                    'an `invalid text: not a string` {Error}', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toEqual(jasmine.any(Promise.AggregateError));
-                    error.forEach(function (error) {
-                        expect(error).toEqual(jasmine.any(Error));
-                        expect(error.message).toEqual(jasmine
-                            .stringMatching(/invalid key reference: not a string or stale|invalid text: not a string/));
-                    });
-                });
+            it('returns a Promise that rejects ' +
+                'with an `invalid key reference: not a string or stale` {Error}', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('invalid key reference: not a string or stale');
             });
         });
-        describe('verify (keyRefs: KeyRef[]|KeyRef, armor: string, opts?: VerifyOpts)' +
-            ': Promise<string>', function () {
-            var message;
+        describe('when the {OpgpLiveKey#armor} method rejects with an {Error}', function () {
+            var error;
+            var result;
             beforeEach(function () {
-                message = jasmine.createSpyObj('message', ['verify', 'getText']);
+                cache.get.and.returnValue(livekey);
+                livekey.armor.and.returnValue(Promise.reject(new Error('boom')));
             });
-            describe('when given a signed armor text string and the valid handle string ' +
-                'of the corresponding authentication key', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(livekey);
-                    openpgp.message.readArmored.and.returnValue(message);
-                    message.verify.and.returnValue([{ keyid: 'keyid', valid: true }]);
-                    message.getText.and.returnValue('plain-text');
-                });
-                beforeEach(function (done) {
-                    service.verify('valid-auth-key-handle', 'signed armor text')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('valid-auth-key-handle');
-                });
-                it('delegates to the openpgp primitive', function () {
-                    expect(openpgp.message.readArmored).toHaveBeenCalledWith('signed armor text');
-                    expect(message.verify).toHaveBeenCalledWith([livekey.key]);
-                    expect(message.getText).toHaveBeenCalledWith();
-                });
-                it('returns a Promise that resolves to the plain text string', function () {
-                    expect(result).toBe('plain-text');
-                    expect(error).not.toBeDefined();
-                });
+            beforeEach(function (done) {
+                service.getArmorFromKey('valid-key-handle')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
             });
-            describe('when given a signed armor text string and a valid handle string ' +
-                'of the wrong authentication key', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(livekey);
-                    openpgp.message.readArmored.and.returnValue(message);
-                    message.verify.and.returnValue([
-                        { keyid: 'verified-keyid', valid: true },
-                        { keyid: 'wrong-keyid', valid: false },
-                        { keyid: 'another-wrong-keyid', valid: false }
-                    ]);
-                });
-                beforeEach(function (done) {
-                    service.verify([
-                        'correct-key-handle', 'wrong-key-handle', 'another-wrong-key-handle'
-                    ], 'signed armor text')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
-                    expect(cache.get.calls.allArgs()).toEqual([
-                        ['correct-key-handle'],
-                        ['wrong-key-handle'],
-                        ['another-wrong-key-handle']
-                    ]);
-                });
-                it('delegates to the openpgp primitive', function () {
-                    expect(openpgp.message.readArmored).toHaveBeenCalledWith('signed armor text');
-                    expect(message.verify).toHaveBeenCalledWith([livekey.key, livekey.key, livekey.key]);
-                    expect(message.getText).not.toHaveBeenCalled();
-                });
-                it('returns a Promise that rejects with an {Error} containing a message ' +
-                    'with a trailing list of the key IDs that fail authentication', function () {
-                    expect(result).not.toBeDefined();
+            it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('valid-key-handle');
+            });
+            it('delegates to the retrieved {OpgpLiveKey} instance', function () {
+                expect(livekey.armor).toHaveBeenCalledWith();
+            });
+            it('returns a Promise that rejects with the {Error} ' +
+                'from the {OpgpLiveKey#armor} method', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('boom');
+            });
+        });
+    });
+    describe('unlock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts)' +
+        ': Promise<OpgpProxyKey>', function () {
+        describe('when given a valid handle string of a locked key ' +
+            'and the correct passphrase', function () {
+            var unlockedLiveKey;
+            var error;
+            var result;
+            beforeEach(function () {
+                livekey.bp.isLocked = true;
+                unlockedLiveKey = {
+                    key: {},
+                    bp: { isLocked: false, keys: [{ id: 'key-id' }], user: { ids: [] } }
+                };
+                cache.get.and.returnValue(livekey);
+                livekey.unlock.and.returnValue(Promise.resolve(unlockedLiveKey));
+                cache.set.and.returnValue('unlocked-key-handle');
+            });
+            beforeEach(function (done) {
+                service.unlock('valid-key-handle', 'secret passphrase')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('valid-key-handle');
+            });
+            it('delegates to the retrieved {OpgpLiveKey} instance', function () {
+                expect(livekey.unlock).toHaveBeenCalledWith('secret passphrase');
+            });
+            it('stores the unlocked key in the underlying cache', function () {
+                expect(cache.set).toHaveBeenCalledWith(unlockedLiveKey);
+            });
+            it('returns a Promise that resolves to an {OpgpProxyKey} instance ' +
+                'of the unlocked {OpgpLiveKey} instance', function () {
+                expect(result).toEqual(jasmine.objectContaining({ handle: 'unlocked-key-handle' }));
+                expect(result).toEqual(jasmine.objectContaining(unlockedLiveKey.bp));
+                expect(error).not.toBeDefined();
+            });
+        });
+        describe('when the referenced {OpgpLiveKey} instance is already unlocked', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                livekey.bp.isLocked = false;
+                cache.get.and.returnValue(livekey);
+                livekey.unlock.and.returnValue(Promise.reject(new Error('key not locked')));
+            });
+            beforeEach(function (done) {
+                service.unlock('unlocked-key-handle', 'passphrase')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('unlocked-key-handle');
+            });
+            it('delegates to the retrieved {OpgpLiveKey} instance', function () {
+                expect(livekey.unlock).toHaveBeenCalledWith('passphrase');
+            });
+            it('returns a Promise that rejects with a `key not locked` {Error} ' +
+                'from the {OpgpLiveKey#unlock} method', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('key not locked');
+            });
+        });
+        describe('when given a stale or invalid handle', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                cache.get.and.returnValue(undefined);
+            });
+            beforeEach(function (done) {
+                service.unlock('stale-key-handle', 'passphrase')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('attempts to retrieve the {OpgpLiveKey} instance ' +
+                'referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('stale-key-handle');
+            });
+            it('returns a Promise that rejects ' +
+                'with an `invalid key reference: not a string or stale` {Error}', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('invalid key reference: not a string or stale');
+            });
+        });
+        describe('when given an incorrect passphrase', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                livekey.bp.isLocked = true;
+                cache.get.and.returnValue(livekey);
+                livekey.unlock
+                    .and.returnValue(Promise.reject(new Error('fail to unlock key')));
+            });
+            beforeEach(function (done) {
+                service.unlock('valid-key-handle', 'incorrect passphrase')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('valid-key-handle');
+            });
+            it('delegates to the retrieved {OpgpLiveKey} instance', function () {
+                expect(livekey.unlock).toHaveBeenCalledWith('incorrect passphrase');
+            });
+            it('returns a Promise that rejects with a `fail to unlock key` {Error} ' +
+                'from the {OpgpLiveKey#unlock} method', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('fail to unlock key');
+            });
+        });
+        describe('when the {OpgpLiveKey#unlock} method rejects with an {Error}', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                livekey.bp.isLocked = true;
+                cache.get.and.returnValue(livekey);
+                livekey.unlock.and.returnValue(Promise.reject(new Error('boom')));
+            });
+            beforeEach(function (done) {
+                service.unlock('valid-key-handle', 'passphrase')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('valid-key-handle');
+            });
+            it('delegates to the retrieved {OpgpLiveKey} instance', function () {
+                expect(livekey.unlock).toHaveBeenCalledWith('passphrase');
+            });
+            it('returns a Promise that rejects with the {Error} ' +
+                'from the {OpgpLiveKey#unlock} method', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('boom');
+            });
+        });
+    });
+    describe('lock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts)' +
+        ': Promise<OpgpProxyKey>', function () {
+        describe('when given a valid handle string of an unlocked key '
+            + 'and a passphrase string', function () {
+            var lockedLiveKey;
+            var error;
+            var result;
+            beforeEach(function () {
+                livekey.bp.isLocked = false;
+                lockedLiveKey = {
+                    key: {},
+                    bp: { isLocked: true, keys: [{ id: 'key-id' }], user: { ids: [] } }
+                };
+                cache.get.and.returnValue(livekey);
+                livekey.lock.and.returnValue(Promise.resolve(lockedLiveKey));
+                cache.set.and.returnValue('locked-key-handle');
+            });
+            beforeEach(function (done) {
+                service.lock('unlocked-key-handle', 'secret passphrase')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('unlocked-key-handle');
+            });
+            it('invalidates the original {OpgpLiveKey} from the cache', function () {
+                expect(cache.del).toHaveBeenCalledWith('unlocked-key-handle');
+            });
+            it('delegates to the retrieved {OpgpLiveKey} instance', function () {
+                expect(livekey.lock).toHaveBeenCalledWith('secret passphrase');
+            });
+            it('stores the unlocked key in the underlying cache', function () {
+                expect(cache.set).toHaveBeenCalledWith(lockedLiveKey);
+            });
+            it('returns a Promise that resolves to an {OpgpProxyKey} instance ' +
+                'of the locked {OpgpLiveKey} instance', function () {
+                expect(result).toEqual(jasmine.objectContaining({ handle: 'locked-key-handle' }));
+                expect(result).toEqual(jasmine.objectContaining(lockedLiveKey.bp));
+                expect(error).not.toBeDefined();
+            });
+        });
+        describe('when the referenced {OpgpLiveKey} instance is already locked', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                livekey.bp.isLocked = true;
+                cache.get.and.returnValue(livekey);
+            });
+            beforeEach(function (done) {
+                service.lock('locked-key-handle', 'passphrase')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('locked-key-handle');
+            });
+            it('does not invalidate the original {OpgpLiveKey} from the cache', function () {
+                expect(cache.del).not.toHaveBeenCalled();
+            });
+            it('does notdelegate to the retrieved {OpgpLiveKey} instance', function () {
+                expect(livekey.lock).not.toHaveBeenCalled();
+            });
+            it('returns a Promise that rejects with a `key not unlocked` {Error} ' +
+                'from the {OpgpLiveKey#lock} method', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('key not unlocked');
+            });
+        });
+        describe('when given a stale or invalid handle', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                cache.get.and.returnValue(undefined);
+            });
+            beforeEach(function (done) {
+                service.lock('stale-key-handle', 'secret passphrase')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('attempts to retrieve the {OpgpLiveKey} instance ' +
+                'referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('stale-key-handle');
+            });
+            it('returns a Promise that rejects ' +
+                'with an `invalid key reference: not a string or stale` {Error}', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('invalid key reference: not a string or stale');
+            });
+        });
+        describe('when the {OpgpLiveKey#lock} method rejects with an {Error}', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                cache.get.and.returnValue(livekey);
+                livekey.lock.and.returnValue(Promise.reject(new Error('boom')));
+            });
+            beforeEach(function (done) {
+                service.lock('valid-key-handle', 'passphrase')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('valid-key-handle');
+            });
+            it('invalidates the original {OpgpLiveKey} from the cache', function () {
+                expect(cache.del).toHaveBeenCalledWith('valid-key-handle');
+            });
+            it('delegates to the retrieved {OpgpLiveKey} instance', function () {
+                expect(livekey.lock).toHaveBeenCalledWith('passphrase');
+            });
+            it('returns a Promise that rejects with the {Error} ' +
+                'from the {OpgpLiveKey#lock} method', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('boom');
+            });
+        });
+    });
+    describe('encrypt (keyRefs: KeyRefMap, plain: string, opts?: EncryptOpts)' +
+        ': Promise<string>', function () {
+        describe('when given a valid plain text string, and valid handles of valid ' +
+            'public cipher and private authentication keys', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                livekey.bp.isLocked = false;
+                cache.get.and.returnValue(livekey);
+                openpgp.encrypt.and.returnValue({ data: 'cipher text' });
+            });
+            beforeEach(function (done) {
+                var refs = {
+                    cipher: 'valid-cipher-key-handle',
+                    auth: 'valid-auth-key-handle'
+                };
+                service.encrypt(refs, 'plain text')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('retrieves the {OpgpLiveKey} instances ' +
+                'referenced by the given handles when compliant', function () {
+                expect(cache.get.calls.allArgs()).toEqual([
+                    ['valid-auth-key-handle'],
+                    ['valid-cipher-key-handle']
+                ]);
+            });
+            it('delegates to the openpgp primitive', function () {
+                expect(openpgp.encrypt)
+                    .toHaveBeenCalledWith(jasmine.objectContaining({
+                    data: 'plain text',
+                    publicKeys: [livekey.key],
+                    privateKeys: [livekey.key]
+                }));
+            });
+            it('returns a Promise that resolves to an armor string ' +
+                'of the given text string ' +
+                'encrypted with the referenced cipher {OpgpLiveKey} instances and ' +
+                'signed with the referenced authentication {OpgpLiveKey} instances ', function () {
+                expect(result).toBe('cipher text');
+                expect(error).not.toBeDefined();
+            });
+        });
+        describe('when given a valid plain text string and a stale handle string', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                cache.get.and.returnValue(undefined);
+            });
+            beforeEach(function (done) {
+                var refs = {
+                    cipher: 'stale-key-handle',
+                    auth: 'stale-key-handle'
+                };
+                service.encrypt(refs, 'plain text')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('attempts to retrieve the {OpgpLiveKey} instance ' +
+                'referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('stale-key-handle');
+            });
+            it('does not delegate to the openpgp primitive', function () {
+                expect(openpgp.encrypt).not.toHaveBeenCalled();
+            });
+            it('returns a Promise that rejects ' +
+                'with an `invalid key reference: not a string or stale` {Error}', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toBeDefined();
+                expect(error.message).toBe('invalid key reference: not a string or stale');
+            });
+        });
+        describe('when given a valid plain text string, ' +
+            'and a valid handle string of a locked private key', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                livekey.bp.isLocked = true;
+                cache.get.and.returnValue(livekey);
+            });
+            beforeEach(function (done) {
+                var refs = {
+                    cipher: 'cipher-key-handle',
+                    auth: 'locked-auth-key-handle'
+                };
+                service.encrypt(refs, 'plain text')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('attempts to retrieve the {OpgpLiveKey} instance ' +
+                'referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('locked-auth-key-handle');
+            });
+            it('does not delegate to the openpgp primitive', function () {
+                expect(openpgp.encrypt).not.toHaveBeenCalled();
+            });
+            it('returns a Promise that rejects ' +
+                'with an `private key not unlocked` {Error}', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toBeDefined();
+                expect(error.message).toBe('private key not unlocked');
+            });
+        });
+        describe('when the underlying openpgp primitive rejects with an {Error}', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                livekey.bp.isLocked = false;
+                cache.get.and.returnValue(livekey);
+                openpgp.encrypt.and.returnValue(Promise.reject(new Error('boom')));
+            });
+            beforeEach(function (done) {
+                var refs = {
+                    cipher: 'valid-cipher-key-handle',
+                    auth: 'valid-auth-key-handle'
+                };
+                service.encrypt(refs, 'plain text')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('retrieves the {OpgpLiveKey} instances ' +
+                'referenced by the given handles when compliant', function () {
+                expect(cache.get.calls.allArgs()).toEqual([
+                    ['valid-auth-key-handle'],
+                    ['valid-cipher-key-handle']
+                ]);
+            });
+            it('delegates to the openpgp primitive', function () {
+                expect(openpgp.encrypt)
+                    .toHaveBeenCalledWith(jasmine.objectContaining({
+                    data: 'plain text',
+                    publicKeys: [livekey.key],
+                    privateKeys: [livekey.key]
+                }));
+            });
+            it('returns a Promise that rejects with the {Error} ' +
+                'from the openpgp primitive', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('boom');
+            });
+        });
+    });
+    describe('decrypt (keyRefs: KeyRefMap, cipher: string, opts?: DecryptOpts)' +
+        ': Promise<string>', function () {
+        var message;
+        beforeEach(function () {
+            message = {};
+        });
+        describe('when given a valid cipher text string, and valid handles of valid ' +
+            'public authentication and a private cipher key', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                livekey.bp.isLocked = false;
+                cache.get.and.returnValue(livekey);
+                openpgp.message.readArmored.and.returnValue(message);
+                openpgp.decrypt.and.returnValue({ data: 'plain text' });
+            });
+            beforeEach(function (done) {
+                var refs = {
+                    cipher: 'valid-cipher-key-handle',
+                    auth: 'valid-auth-key-handle'
+                };
+                service.decrypt(refs, 'cipher text')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('retrieves the {OpgpLiveKey} instances ' +
+                'referenced by the given handles when compliant', function () {
+                expect(cache.get.calls.allArgs()).toEqual([
+                    ['valid-cipher-key-handle'],
+                    ['valid-auth-key-handle']
+                ]);
+            });
+            it('delegates to the openpgp primitive', function () {
+                expect(openpgp.message.readArmored).toHaveBeenCalledWith('cipher text');
+                expect(openpgp.decrypt)
+                    .toHaveBeenCalledWith(jasmine.objectContaining({
+                    message: message,
+                    publicKeys: [livekey.key],
+                    privateKey: livekey.key
+                }));
+            });
+            it('returns a Promise that resolves to an armor string ' +
+                'of the given text string ' +
+                'decrypted with the referenced cipher {OpgpLiveKey} instance and ' +
+                'authenticated with the referenced authentication {OpgpLiveKey} instances ', function () {
+                expect(result).toBe('plain text');
+                expect(error).not.toBeDefined();
+            });
+        });
+        describe('when given a valid plain text string and a stale handle string', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                cache.get.and.returnValue(undefined);
+            });
+            beforeEach(function (done) {
+                var refs = {
+                    cipher: 'stale-key-handle',
+                    auth: 'stale-key-handle'
+                };
+                service.decrypt(refs, 'cipher text')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('attempts to retrieve the {OpgpLiveKey} instance ' +
+                'referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('stale-key-handle');
+            });
+            it('does not delegate to the openpgp primitive', function () {
+                expect(openpgp.message.readArmored).not.toHaveBeenCalled();
+                expect(openpgp.decrypt).not.toHaveBeenCalled();
+            });
+            it('returns a Promise that rejects ' +
+                'with an `invalid key reference: not a string or stale` {Error}', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toBeDefined();
+                expect(error.message).toBe('invalid key reference: not a string or stale');
+            });
+        });
+        describe('when given a valid plain text string, ' +
+            'and a valid handle string of a locked private key', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                livekey.bp.isLocked = true;
+                cache.get.and.returnValue(livekey);
+            });
+            beforeEach(function (done) {
+                var refs = {
+                    cipher: 'locked-cipher-key-handle',
+                    auth: 'auth-key-handle'
+                };
+                service.decrypt(refs, 'cipher text')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('attempts to retrieve the {OpgpLiveKey} instance ' +
+                'referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('locked-cipher-key-handle');
+            });
+            it('does not delegate to the openpgp primitive', function () {
+                expect(openpgp.message.readArmored).not.toHaveBeenCalled();
+                expect(openpgp.decrypt).not.toHaveBeenCalled();
+            });
+            it('returns a Promise that rejects ' +
+                'with an `private key not unlocked` {Error}', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toBeDefined();
+                expect(error.message).toBe('private key not unlocked');
+            });
+        });
+        describe('when the underlying openpgp primitive rejects with an {Error}', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                livekey.bp.isLocked = false;
+                cache.get.and.returnValue(livekey);
+                openpgp.message.readArmored.and.returnValue(message);
+                openpgp.decrypt.and.returnValue(Promise.reject(new Error('boom')));
+            });
+            beforeEach(function (done) {
+                var refs = {
+                    cipher: 'valid-cipher-key-handle',
+                    auth: 'valid-auth-key-handle'
+                };
+                service.decrypt(refs, 'cipher text')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('retrieves the {OpgpLiveKey} instances ' +
+                'referenced by the given handles when compliant', function () {
+                expect(cache.get.calls.allArgs()).toEqual([
+                    ['valid-cipher-key-handle'],
+                    ['valid-auth-key-handle']
+                ]);
+            });
+            it('delegates to the openpgp primitive', function () {
+                expect(openpgp.message.readArmored).toHaveBeenCalledWith('cipher text');
+                expect(openpgp.decrypt)
+                    .toHaveBeenCalledWith(jasmine.objectContaining({
+                    message: message,
+                    publicKeys: [livekey.key],
+                    privateKey: livekey.key
+                }));
+            });
+            it('returns a Promise that rejects with the {Error} ' +
+                'from the openpgp primitive', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message).toBe('boom');
+            });
+        });
+    });
+    describe('sign (keyRefs: KeyRef[]|KeyRef, text: string, opts?: SignOpts)' +
+        ': Promise<string>', function () {
+        var message;
+        beforeEach(function () {
+            message = jasmine.createSpyObj('message', ['sign', 'armor']);
+        });
+        describe('when given a text string and a valid handle string that is not stale', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                cache.get.and.returnValue(livekey);
+                openpgp.message.fromText.and.returnValue(message);
+                message.sign.and.returnValue(message);
+                message.armor.and.returnValue('signed-armor-text');
+            });
+            beforeEach(function (done) {
+                service.sign('valid-key-handle', 'plain text')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('valid-key-handle');
+            });
+            it('delegates to the openpgp primitive', function () {
+                expect(openpgp.message.fromText).toHaveBeenCalledWith('plain text');
+                expect(message.sign).toHaveBeenCalledWith([livekey.key]);
+                expect(message.armor).toHaveBeenCalledWith();
+            });
+            it('returns a Promise that resolves to an armor string ' +
+                'of the given text string ' +
+                'signed with the referenced {OpgpLiveKey} instance ', function () {
+                expect(result).toBe('signed-armor-text');
+                expect(error).not.toBeDefined();
+            });
+        });
+        describe('when given a text string and a stale handle string', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                cache.get.and.returnValue(undefined);
+            });
+            beforeEach(function (done) {
+                service.sign('stale-key-handle', 'plain text')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('attempts to retrieve the {OpgpLiveKey} instance ' +
+                'referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('stale-key-handle');
+            });
+            it('does not delegate to the openpgp primitive', function () {
+                expect(openpgp.message.fromText).not.toHaveBeenCalled();
+            });
+            it('returns a Promise that rejects ' +
+                'with an `invalid key reference: not a string or stale` {Error}', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toBeDefined();
+                expect(error.message).toBe('invalid key reference: not a string or stale');
+            });
+        });
+        describe('when given non-compliant arguments', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                cache.get.and.returnValue(livekey);
+            });
+            beforeEach(function (done) {
+                var args = getInvalidAuthArgs();
+                Promise.any(args.map(function (args) { return service.sign.apply(service, args); }))
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('attempts to retrieve the {OpgpLiveKey} instances ' +
+                'referenced by the given handles when compliant', function () {
+                cache.get.calls.allArgs()
+                    .forEach(function (args) { return expect(args).toEqual(['compliant handle']); });
+            });
+            it('does not delegate to the openpgp primitive', function () {
+                expect(openpgp.message.fromText).not.toHaveBeenCalled();
+            });
+            it('returns a Promise that rejects ' +
+                'with an `invalid key reference: not a string or stale` or ' +
+                'an `invalid text: not a string` {Error}', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toEqual(jasmine.any(Promise.AggregateError));
+                error.forEach(function (error) {
                     expect(error).toEqual(jasmine.any(Error));
-                    expect(error.message)
-                        .toBe('authentication failed: wrong-keyid,another-wrong-keyid');
-                });
-            });
-            describe('when given a signed armor text string and a stale handle string', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(undefined);
-                });
-                beforeEach(function (done) {
-                    service.verify('stale-key-handle', 'signed armor text')
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('attempts to retrieve the {OpgpLiveKey} instance ' +
-                    'referenced by the given handle', function () {
-                    expect(cache.get).toHaveBeenCalledWith('stale-key-handle');
-                });
-                it('does not delegate to the openpgp primitive', function () {
-                    expect(openpgp.message.readArmored).not.toHaveBeenCalled();
-                });
-                it('returns a Promise that rejects ' +
-                    'with an `invalid key reference: not a string or stale` {Error}', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toBeDefined();
-                    expect(error.message).toBe('invalid key reference: not a string or stale');
-                });
-            });
-            describe('when given non-compliant arguments', function () {
-                var error;
-                var result;
-                beforeEach(function () {
-                    cache.get.and.returnValue(livekey);
-                });
-                beforeEach(function (done) {
-                    var args = getInvalidAuthArgs();
-                    Promise.any(args.map(function (args) { return service.verify.apply(service, args); }))
-                        .then(function (res) { return result = res; })
-                        .catch(function (err) { return error = err; })
-                        .finally(function () { return setTimeout(done); });
-                });
-                it('attempts to retrieve the {OpgpLiveKey} instances ' +
-                    'referenced by the given handles when compliant', function () {
-                    cache.get.calls.allArgs()
-                        .forEach(function (args) { return expect(args).toEqual(['compliant handle']); });
-                });
-                it('does not delegate to the openpgp primitive', function () {
-                    expect(openpgp.message.readArmored).not.toHaveBeenCalled();
-                });
-                it('returns a Promise that rejects ' +
-                    'with an `invalid key reference: not a string or stale` or ' +
-                    'an `invalid armor: not a string` {Error}', function () {
-                    expect(result).not.toBeDefined();
-                    expect(error).toEqual(jasmine.any(Promise.AggregateError));
-                    error.forEach(function (error) {
-                        expect(error).toEqual(jasmine.any(Error));
-                        expect(error.message).toEqual(jasmine
-                            .stringMatching(/invalid key reference: not a string or stale|invalid armor: not a string/));
-                    });
+                    expect(error.message).toEqual(jasmine
+                        .stringMatching(/invalid key reference: not a string or stale|invalid text: not a string/));
                 });
             });
         });
     });
-    function getInvalidAuthArgs() {
-        var types = [
-            undefined,
-            null,
-            NaN,
-            true,
-            42,
-            'foo',
-            ['foo'],
-            { foo: 'foo' }
-        ];
-        function isString(val) {
-            return typeof val === 'string';
-        }
-        var nonStringTypes = types
-            .filter(function (val) { return !isString(val); });
-        return nonStringTypes
-            .filter(function (val) { return !Array.isArray(val); })
-            .map(function (invalidKeyRef) { return [invalidKeyRef, 'compliant text']; })
-            .concat(nonStringTypes
-            .map(function (invalidKeyRef) { return [[invalidKeyRef], 'compliant text']; }))
-            .concat(nonStringTypes
-            .map(function (invalidText) { return ['compliant handle', invalidText]; }));
+    describe('verify (keyRefs: KeyRef[]|KeyRef, armor: string, opts?: VerifyOpts)' +
+        ': Promise<string>', function () {
+        var message;
+        beforeEach(function () {
+            message = jasmine.createSpyObj('message', ['verify', 'getText']);
+        });
+        describe('when given a signed armor text string and the valid handle string ' +
+            'of the corresponding authentication key', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                cache.get.and.returnValue(livekey);
+                openpgp.message.readArmored.and.returnValue(message);
+                message.verify.and.returnValue([{ keyid: 'keyid', valid: true }]);
+                message.getText.and.returnValue('plain-text');
+            });
+            beforeEach(function (done) {
+                service.verify('valid-auth-key-handle', 'signed armor text')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('valid-auth-key-handle');
+            });
+            it('delegates to the openpgp primitive', function () {
+                expect(openpgp.message.readArmored).toHaveBeenCalledWith('signed armor text');
+                expect(message.verify).toHaveBeenCalledWith([livekey.key]);
+                expect(message.getText).toHaveBeenCalledWith();
+            });
+            it('returns a Promise that resolves to the plain text string', function () {
+                expect(result).toBe('plain-text');
+                expect(error).not.toBeDefined();
+            });
+        });
+        describe('when given a signed armor text string and a valid handle string ' +
+            'of the wrong authentication key', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                cache.get.and.returnValue(livekey);
+                openpgp.message.readArmored.and.returnValue(message);
+                message.verify.and.returnValue([
+                    { keyid: 'verified-keyid', valid: true },
+                    { keyid: 'wrong-keyid', valid: false },
+                    { keyid: 'another-wrong-keyid', valid: false }
+                ]);
+            });
+            beforeEach(function (done) {
+                service.verify([
+                    'correct-key-handle', 'wrong-key-handle', 'another-wrong-key-handle'
+                ], 'signed armor text')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('retrieves the {OpgpLiveKey} instance referenced by the given handle', function () {
+                expect(cache.get.calls.allArgs()).toEqual([
+                    ['correct-key-handle'],
+                    ['wrong-key-handle'],
+                    ['another-wrong-key-handle']
+                ]);
+            });
+            it('delegates to the openpgp primitive', function () {
+                expect(openpgp.message.readArmored).toHaveBeenCalledWith('signed armor text');
+                expect(message.verify).toHaveBeenCalledWith([livekey.key, livekey.key, livekey.key]);
+                expect(message.getText).not.toHaveBeenCalled();
+            });
+            it('returns a Promise that rejects with an {Error} containing a message ' +
+                'with a trailing list of the key IDs that fail authentication', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toEqual(jasmine.any(Error));
+                expect(error.message)
+                    .toBe('authentication failed: wrong-keyid,another-wrong-keyid');
+            });
+        });
+        describe('when given a signed armor text string and a stale handle string', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                cache.get.and.returnValue(undefined);
+            });
+            beforeEach(function (done) {
+                service.verify('stale-key-handle', 'signed armor text')
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('attempts to retrieve the {OpgpLiveKey} instance ' +
+                'referenced by the given handle', function () {
+                expect(cache.get).toHaveBeenCalledWith('stale-key-handle');
+            });
+            it('does not delegate to the openpgp primitive', function () {
+                expect(openpgp.message.readArmored).not.toHaveBeenCalled();
+            });
+            it('returns a Promise that rejects ' +
+                'with an `invalid key reference: not a string or stale` {Error}', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toBeDefined();
+                expect(error.message).toBe('invalid key reference: not a string or stale');
+            });
+        });
+        describe('when given non-compliant arguments', function () {
+            var error;
+            var result;
+            beforeEach(function () {
+                cache.get.and.returnValue(livekey);
+            });
+            beforeEach(function (done) {
+                var args = getInvalidAuthArgs();
+                Promise.any(args.map(function (args) { return service.verify.apply(service, args); }))
+                    .then(function (res) { return result = res; })
+                    .catch(function (err) { return error = err; })
+                    .finally(function () { return setTimeout(done); });
+            });
+            it('attempts to retrieve the {OpgpLiveKey} instances ' +
+                'referenced by the given handles when compliant', function () {
+                cache.get.calls.allArgs()
+                    .forEach(function (args) { return expect(args).toEqual(['compliant handle']); });
+            });
+            it('does not delegate to the openpgp primitive', function () {
+                expect(openpgp.message.readArmored).not.toHaveBeenCalled();
+            });
+            it('returns a Promise that rejects ' +
+                'with an `invalid key reference: not a string or stale` or ' +
+                'an `invalid armor: not a string` {Error}', function () {
+                expect(result).not.toBeDefined();
+                expect(error).toEqual(jasmine.any(Promise.AggregateError));
+                error.forEach(function (error) {
+                    expect(error).toEqual(jasmine.any(Error));
+                    expect(error.message).toEqual(jasmine
+                        .stringMatching(/invalid key reference: not a string or stale|invalid armor: not a string/));
+                });
+            });
+        });
+    });
+});
+function getInvalidAuthArgs() {
+    var types = [
+        undefined,
+        null,
+        NaN,
+        true,
+        42,
+        'foo',
+        ['foo'],
+        { foo: 'foo' }
+    ];
+    function isString(val) {
+        return typeof val === 'string';
     }
-}());
+    var nonStringTypes = types
+        .filter(function (val) { return !isString(val); });
+    return nonStringTypes
+        .filter(function (val) { return !Array.isArray(val); })
+        .map(function (invalidKeyRef) { return [invalidKeyRef, 'compliant text']; })
+        .concat(nonStringTypes
+        .map(function (invalidKeyRef) { return [[invalidKeyRef], 'compliant text']; }))
+        .concat(nonStringTypes
+        .map(function (invalidText) { return ['compliant handle', invalidText]; }));
+}
 
-},{"../src/index.ts":8,"bluebird":undefined,"proxyquireify":5}],7:[function(require,module,exports){
+},{"../src":3,"bluebird":undefined}],2:[function(require,module,exports){
 "use strict";
 ;
 var live_key_1 = require("../src/live-key");
@@ -1851,14 +1550,13 @@ describe('OpgpLiveKey', function () {
     });
 });
 
-},{"../src/live-key":9,"base64-js":undefined}],8:[function(require,module,exports){
+},{"../src/live-key":4,"base64-js":undefined}],3:[function(require,module,exports){
 "use strict";
 ;
 var live_key_1 = require("./live-key");
 var proxy_key_1 = require("./proxy-key");
 var utils_1 = require("./utils");
 var csrkey_cache_1 = require("csrkey-cache");
-var openpgp = require('openpgp');
 var Promise = require("bluebird");
 var tslib_1 = require("tslib");
 var OpgpServiceClass = (function () {
@@ -2038,13 +1736,14 @@ function getOpenpgp(config) {
     if (isOpenpgp(config)) {
         return config;
     }
+    var openpgp = require('openpgp');
     return configureOpenpgp(openpgp, OPENPGP_CONFIG_DEFAULTS, config);
 }
 function isOpenpgp(val) {
     return !!val && ['config', 'crypto', 'key', 'message']
         .every(function (prop) { return !!val[prop]; })
         && [
-            val.crypto.encrypt, val.crypto.decrypt,
+            val.encrypt, val.decrypt,
             val.crypto.hash && val.crypto.hash.sha256,
             val.key.readArmored, val.key.generateKey,
             val.message.fromText, val.message.readArmored
@@ -2097,7 +1796,7 @@ var getOpgpService = OpgpServiceClass.getInstance;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = getOpgpService;
 
-},{"./live-key":9,"./proxy-key":10,"./utils":11,"bluebird":undefined,"csrkey-cache":undefined,"openpgp":undefined,"tslib":undefined}],9:[function(require,module,exports){
+},{"./live-key":4,"./proxy-key":5,"./utils":6,"bluebird":undefined,"csrkey-cache":undefined,"openpgp":undefined,"tslib":undefined}],4:[function(require,module,exports){
 "use strict";
 ;
 var base64 = require("base64-js");
@@ -2227,7 +1926,7 @@ var getLiveKeyFactory = LiveKeyClass.getFactory;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = getLiveKeyFactory;
 
-},{"base64-js":undefined,"bluebird":undefined,"tslib":undefined}],10:[function(require,module,exports){
+},{"base64-js":undefined,"bluebird":undefined,"tslib":undefined}],5:[function(require,module,exports){
 "use strict";
 ;
 var tslib_1 = require("tslib");
@@ -2240,7 +1939,7 @@ var getProxyKey = function (handle, blueprint) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = getProxyKey;
 
-},{"tslib":undefined}],11:[function(require,module,exports){
+},{"tslib":undefined}],6:[function(require,module,exports){
 "use strict";
 ;
 function isString(val) {
@@ -2260,4 +1959,4 @@ function isFunction(val) {
 }
 exports.isFunction = isFunction;
 
-},{}]},{},[6,7]);
+},{}]},{},[1,2]);
