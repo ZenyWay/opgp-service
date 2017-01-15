@@ -28,6 +28,9 @@ module.exports = function (config) {
     files: [
       '**/*.spec.ts'
     ],
+    mime: {
+      'text/x-typescript': [ 'ts', 'tsx' ] // workaround for Chrome, as in https://github.com/angular/angular-cli/issues/2125
+    },
     exclude: [
       'reports/**/*',
       'support/**/*'
