@@ -16,7 +16,7 @@ beforeEach(function () {
     openpgp = {
         config: {},
         crypto: { hash: jasmine.createSpyObj('hash', ['sha256']) },
-        key: jasmine.createSpyObj('key', ['readArmored', 'generateKey']),
+        key: jasmine.createSpyObj('key', ['readArmored', 'generate']),
         message: jasmine.createSpyObj('message', ['fromText', 'readArmored']),
         encrypt: jasmine.createSpy('encrypt'),
         decrypt: jasmine.createSpy('decrypt')
@@ -163,7 +163,7 @@ describe('OpgpService', function () {
             service.generateKey('secret passphrase')
                 .catch(function () { })
                 .finally(function () {
-                expect(openpgp.key.generateKey).toHaveBeenCalledWith(jasmine.objectContaining({
+                expect(openpgp.key.generate).toHaveBeenCalledWith(jasmine.objectContaining({
                     passphrase: 'secret passphrase',
                     numBits: 4096
                 }));
@@ -174,7 +174,7 @@ describe('OpgpService', function () {
             var error;
             var result;
             beforeEach(function () {
-                openpgp.key.generateKey.and.returnValue(Promise.resolve(livekey.key));
+                openpgp.key.generate.and.returnValue(Promise.resolve(livekey.key));
                 getLiveKey.and.returnValue(livekey);
                 cache.set.and.returnValue('key-handle');
             });
@@ -200,7 +200,7 @@ describe('OpgpService', function () {
             var error;
             var result;
             beforeEach(function () {
-                openpgp.key.generateKey.and.throwError('boom');
+                openpgp.key.generate.and.throwError('boom');
             });
             beforeEach(function (done) {
                 service.generateKey('secret passphrase')
@@ -1580,7 +1580,7 @@ var OpgpServiceClass = (function () {
                     numBits: opts && opts.size || 4096,
                     unlocked: opts && !!opts.unlocked
                 };
-                return _this.openpgp.key.generateKey(options)
+                return _this.openpgp.key.generate(options)
                     .then(function (key) { return _this.cacheAndProxyKey(_this.getLiveKey(key)); });
             });
     };
@@ -1745,7 +1745,7 @@ function isOpenpgp(val) {
         && [
             val.encrypt, val.decrypt,
             val.crypto.hash && val.crypto.hash.sha256,
-            val.key.readArmored, val.key.generateKey,
+            val.key.readArmored, val.key.generate,
             val.message.fromText, val.message.readArmored
         ].every(function (fun) { return utils_1.isFunction(fun); });
 }

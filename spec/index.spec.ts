@@ -29,7 +29,7 @@ beforeEach(() => { // mock dependencies
   openpgp = {
     config: {},
     crypto: { hash: jasmine.createSpyObj('hash', [ 'sha256' ]) },
-    key: jasmine.createSpyObj('key', [ 'readArmored', 'generateKey' ]),
+    key: jasmine.createSpyObj('key', [ 'readArmored', 'generate' ]),
     message: jasmine.createSpyObj('message', [ 'fromText', 'readArmored' ]),
     encrypt: jasmine.createSpy('encrypt'),
     decrypt: jasmine.createSpy('decrypt')
@@ -189,7 +189,7 @@ describe('OpgpService', () => {
       service.generateKey('secret passphrase')
       .catch(() => {}) // ignore
       .finally(() => {
-        expect(openpgp.key.generateKey).toHaveBeenCalledWith(jasmine.objectContaining({
+        expect(openpgp.key.generate).toHaveBeenCalledWith(jasmine.objectContaining({
           passphrase: 'secret passphrase',
           numBits: 4096
         }))
@@ -202,7 +202,7 @@ describe('OpgpService', () => {
       let error: any
       let result: any
       beforeEach(() => {
-        openpgp.key.generateKey.and.returnValue(Promise.resolve(livekey.key))
+        openpgp.key.generate.and.returnValue(Promise.resolve(livekey.key))
         getLiveKey.and.returnValue(livekey)
         cache.set.and.returnValue('key-handle')
       })
@@ -234,7 +234,7 @@ describe('OpgpService', () => {
       let error: any
       let result: any
       beforeEach(() => {
-        openpgp.key.generateKey.and.throwError('boom')
+        openpgp.key.generate.and.throwError('boom')
       })
 
       beforeEach((done) => {

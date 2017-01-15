@@ -439,7 +439,7 @@ class OpgpServiceClass implements OpgpService {
         unlocked: opts && !!opts.unlocked
       }
 
-    	return this.openpgp.key.generateKey(options)
+    	return this.openpgp.key.generate(options)
 			.then((key: any) => this.cacheAndProxyKey(this.getLiveKey(key)))
     })
   }
@@ -713,7 +713,7 @@ function isOpenpgp (val: any): boolean {
   && [
     val.encrypt, val.decrypt,
     val.crypto.hash && val.crypto.hash.sha256,
-    val.key.readArmored, val.key.generateKey,
+    val.key.readArmored, val.key.generate,
     val.message.fromText, val.message.readArmored
   ].every(fun => isFunction(fun))
 }
