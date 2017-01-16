@@ -157,15 +157,17 @@ describe('OpgpService', function () {
             });
         });
     });
-    describe('generateKey (passphrase: string, opts?: OpgpKeyOpts)' +
+    describe('generateKey (user: UserId[]|UserId, opts?: OpgpKeyOpts)' +
         ': Promise<OpgpProxyKey>', function () {
         it('delegates to the openpgp primitive', function (done) {
-            service.generateKey('secret passphrase')
+            service.generateKey('john.doe@test.com', { passphrase: 'secret passphrase' })
                 .catch(function () { })
                 .finally(function () {
                 expect(openpgp.key.generate).toHaveBeenCalledWith(jasmine.objectContaining({
+                    userIds: jasmine.arrayContaining(['john.doe@test.com']),
                     passphrase: 'secret passphrase',
-                    numBits: 4096
+                    numBits: 4096,
+                    unlocked: false
                 }));
                 setTimeout(done);
             });
@@ -179,7 +181,7 @@ describe('OpgpService', function () {
                 cache.set.and.returnValue('key-handle');
             });
             beforeEach(function (done) {
-                service.generateKey('secret passphrase')
+                service.generateKey('john.doe@test.com')
                     .then(function (res) { return result = res; })
                     .catch(function (err) { return error = err; })
                     .finally(function () { return setTimeout(done); });
@@ -203,7 +205,7 @@ describe('OpgpService', function () {
                 openpgp.key.generate.and.throwError('boom');
             });
             beforeEach(function (done) {
-                service.generateKey('secret passphrase')
+                service.generateKey('john.doe@test.com')
                     .then(function (res) { return result = res; })
                     .catch(function (err) { return error = err; })
                     .finally(function () { return setTimeout(done); });
@@ -1559,6 +1561,10 @@ var utils_1 = require("./utils");
 var csrkey_cache_1 = require("csrkey-cache");
 var Promise = require("bluebird");
 var tslib_1 = require("tslib");
+var OPGP_KEY_DEFAULTS = {
+    size: 4096,
+    unlocked: false
+};
 var OpgpServiceClass = (function () {
     function OpgpServiceClass(cache, getLiveKey, getProxyKey, openpgp) {
         this.cache = cache;
@@ -1570,19 +1576,12 @@ var OpgpServiceClass = (function () {
         var openpgp = configureOpenpgp(this.openpgp, config);
         return Promise.resolve(tslib_1.__assign({}, openpgp.config));
     };
-    OpgpServiceClass.prototype.generateKey = function (passphrase, opts) {
+    OpgpServiceClass.prototype.generateKey = function (user, opts) {
         var _this = this;
-        return !utils_1.isString(passphrase) ? reject('invalid passphrase: not a string')
-            : Promise.try(function () {
-                var options = {
-                    userIds: opts && [].concat(opts.users),
-                    passphrase: passphrase,
-                    numBits: opts && opts.size || 4096,
-                    unlocked: opts && !!opts.unlocked
-                };
-                return _this.openpgp.key.generate(options)
+        return !isValidUser(user) ? reject('invalid user')
+            : !isValidKeyOpts(opts) ? reject('invalid key options')
+                : Promise.try(function () { return _this.openpgp.key.generate(toKeySpec(user, opts)); })
                     .then(function (key) { return _this.cacheAndProxyKey(_this.getLiveKey(key)); });
-            });
     };
     OpgpServiceClass.prototype.getKeysFromArmor = function (armor, opts) {
         var _this = this;
@@ -1791,6 +1790,31 @@ function toValidOpenpgpConfig(val) {
         config[key] = value;
         return config;
     }, {});
+}
+function isValidUser(val) {
+    if (Array.isArray(val)) {
+        return val.every(isValidUser);
+    }
+    return utils_1.isString(val)
+        || !!val && utils_1.isString(val.email) && (!name || utils_1.isString(val.name));
+}
+function isValidKeyOpts(val) {
+    return !val
+        || (!val.passphrase || utils_1.isString(val.passphrase))
+            && (!val.size || utils_1.isNumber(val.size))
+            && (!val.unlocked || utils_1.isBoolean(val.unlocked));
+}
+function toKeySpec(user, opts) {
+    var config = tslib_1.__assign({ user: [].concat(user) }, OPGP_KEY_DEFAULTS, opts);
+    var spec = {
+        userIds: config.user,
+        numBits: config.size,
+        unlocked: config.unlocked
+    };
+    if (config.passphrase) {
+        spec.passphrase = config.passphrase;
+    }
+    return spec;
 }
 var getOpgpService = OpgpServiceClass.getInstance;
 Object.defineProperty(exports, "__esModule", { value: true });

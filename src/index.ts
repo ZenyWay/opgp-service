@@ -57,14 +57,17 @@ export interface OpgpService {
    * Currently only supports RSA keys.
    * Primary and subkey will be of same type.
    *
-   * @param {String} passphrase the passphrase used to encrypt the generated key.
+   * @param {UserId[]|UserId} user
+   * e.g. { name:'Phil Zimmermann', email:'phil@openpgp.org' }
+   * or 'Phil Zimmermann <phil@openpgp.org>'
    * @param {OpgpKeyOpts={}} opts
    *
-   * @error {Error} 'invalid passphrase: not a string'
+   * @error {Error} 'invalid user'
+   * @error {Error} 'invalid key options'
    *
    * @returns {Promise<OpgpProxyKey>}
    */
-  generateKey (passphrase: string, opts?: OpgpKeyOpts): Promise<OpgpProxyKey>
+  generateKey (user: UserId[]|UserId, opts?: OpgpKeyOpts): Promise<OpgpProxyKey>
   /**
    * @public
    * @method
@@ -262,20 +265,18 @@ export { OpgpProxyKey }
 
 export interface OpgpKeyOpts {
   /**
+   * @prop {String=} passphrase the passphrase used to encrypt the generated key.
+   */
+  passphrase?: string
+  /**
    * @prop {number=4096} size number of bits of the generated key.
    * should be 2048 or 4096.
    */
-  size: number
+  size?: number
   /**
    * @prop {boolean=false} unlocked when true, the generated key is unlocked.
    */
-  unlocked: boolean
-  /**
-   * @prop {(UserId[]|UserId)=} users
-   * e.g. { name:'Phil Zimmermann', email:'phil@openpgp.org' }
-   * or 'Phil Zimmermann <phil@openpgp.org>'
-   */
-  users: UserId[]|UserId
+  unlocked?: boolean
 }
 
 export type UserId = UserIdSpec|string
@@ -407,6 +408,11 @@ export interface CommonOpts {
   valid: number
 }
 
+const OPGP_KEY_DEFAULTS = {
+  size: 4096,
+  unlocked: false
+}
+
 class OpgpServiceClass implements OpgpService {
   static getInstance: OpgpServiceFactory =
   function (config?: OpgpServiceFactoryConfig): OpgpService {
@@ -429,19 +435,11 @@ class OpgpServiceClass implements OpgpService {
     return Promise.resolve(assign({}, openpgp.config))
   }
 
-  generateKey (passphrase: string, opts?: OpgpKeyOpts): Promise<OpgpProxyKey> {
-    return !isString(passphrase) ? reject('invalid passphrase: not a string')
-    : Promise.try(() => {
-      const options = {
-        userIds: opts && [].concat(opts.users),
-        passphrase: passphrase,
-        numBits: opts && opts.size || 4096,
-        unlocked: opts && !!opts.unlocked
-      }
-
-    	return this.openpgp.key.generate(options)
-			.then((key: any) => this.cacheAndProxyKey(this.getLiveKey(key)))
-    })
+  generateKey (user: UserId[]|UserId, opts?: OpgpKeyOpts): Promise<OpgpProxyKey> {
+    return !isValidUser(user) ? reject('invalid user')
+    : !isValidKeyOpts(opts) ? reject('invalid key options')
+    : Promise.try(() =>  this.openpgp.key.generate(toKeySpec(user, opts)))
+    .then((key: any) => this.cacheAndProxyKey(this.getLiveKey(key)))
   }
 
   getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)
@@ -781,6 +779,37 @@ function toValidOpenpgpConfig (val: any): OpenpgpConfig {
     config[key] = value
     return config
   }, <OpenpgpConfig>{})
+}
+
+function isValidUser (val: any): val is UserId[]|UserId {
+  if (Array.isArray(val)) { return val.every(isValidUser) }
+  return isString(val)
+  || !!val && isString(val.email) && (!name || isString(val.name))
+}
+
+function isValidKeyOpts (val: any): boolean {
+  return !val
+  || (!val.passphrase || isString(val.passphrase))
+  && (!val.size || isNumber(val.size))
+  && (!val.unlocked || isBoolean(val.unlocked))
+}
+
+interface OpenpgpKeySpec {
+  userIds: UserId[]
+  passphrase?: string
+  numBits?: number
+  unlocked?: false
+}
+
+function toKeySpec (user: UserId[]|UserId, opts: OpgpKeyOpts) {
+  const config = assign({ user: [].concat(user) }, OPGP_KEY_DEFAULTS, opts)
+  const spec = <OpenpgpKeySpec> {
+    userIds: config.user,
+    numBits: config.size,
+    unlocked: config.unlocked
+  }
+  if (config.passphrase) { spec.passphrase = config.passphrase }
+  return spec
 }
 
 const getOpgpService = OpgpServiceClass.getInstance

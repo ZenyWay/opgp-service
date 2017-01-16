@@ -183,15 +183,17 @@ describe('OpgpService', () => {
     })
   })
 
-  describe('generateKey (passphrase: string, opts?: OpgpKeyOpts)' +
+  describe('generateKey (user: UserId[]|UserId, opts?: OpgpKeyOpts)' +
   ': Promise<OpgpProxyKey>', () => {
     it('delegates to the openpgp primitive', (done) => {
-      service.generateKey('secret passphrase')
+      service.generateKey('john.doe@test.com', { passphrase: 'secret passphrase' })
       .catch(() => {}) // ignore
       .finally(() => {
         expect(openpgp.key.generate).toHaveBeenCalledWith(jasmine.objectContaining({
+          userIds: jasmine.arrayContaining([ 'john.doe@test.com' ]),
           passphrase: 'secret passphrase',
-          numBits: 4096
+          numBits: 4096,
+          unlocked: false
         }))
         setTimeout(done)
       })
@@ -208,7 +210,7 @@ describe('OpgpService', () => {
       })
 
       beforeEach((done) => {
-        service.generateKey('secret passphrase')
+        service.generateKey('john.doe@test.com')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
@@ -238,7 +240,7 @@ describe('OpgpService', () => {
       })
 
       beforeEach((done) => {
-        service.generateKey('secret passphrase')
+        service.generateKey('john.doe@test.com')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
