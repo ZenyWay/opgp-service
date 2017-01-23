@@ -40,7 +40,9 @@ this hinders coupling in client code through the service API.
 ## fully async: reads like sync
 async all the way makes it easy to write code that [reads like synchronous code](https://www.npmjs.com/package/resolve-call),
 and streamlines error-control flow.
-* all API methods return a `Promise`.
+* all API method arguments may be either immediately available
+or `Promise` instances that eventually resolve,
+* all API methods return a `Promise`,
 * any exception thrown by `openpgp` is converted into a rejected `Promise`.
 
 # <a name="example"></a> EXAMPLE
@@ -74,27 +76,23 @@ log(plain) // 'rob says wow!'
 ```
 note that although the above code reads like synchronous code,
 it is in fact fully async.
-the files of this example are available [here](./spec/example).
 
-a live version of this example can be viewed [here](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.1.0/spec/example/index.html)
-in the browser console,
+the files of this example are available [in the `example` folder](./spec/example).
+
+a live version of this example can be viewed [in the browser console](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.1.0/spec/example/index.html),
 or by cloning this repository and running the following commands from a terminal:
 ```bash
 npm install
 npm run example
 ```
 
-# <a name="api"></a> API 2.0 stable
+# <a name="api"></a> API 2.1 stable
 the current version exposes the following service methods:
 * configure
 * generateKey, getKeysFromArmor, getArmorFromKey
 * unlock, lock
 * encrypt, decrypt
 * sign, verify
-
-all methods accept arguments that may be either immediately available,
-or a Promise that eventually resolves, and return a Promise,
-as demonstrated in the above example.
 
 for a detailed specification of the API
 * run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.1.0/spec/web/index.html)
