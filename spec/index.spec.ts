@@ -80,7 +80,7 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
       cache.set.and.returnValue('key-handle')
     })
 
-    beforeEach(() => {
+    beforeEach((done) => {
       service = getService({
         cache: cache,
         getLiveKey: getLiveKey,
@@ -88,6 +88,8 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
         openpgp: openpgp
       })
       service.getKeysFromArmor('key-armor')
+      .then(() => setTimeout(done))
+      .catch(() => setTimeout(done.fail))
     })
 
     it('returns an {OpgpService} instance based on the given dependencies ', () =>{
@@ -133,7 +135,7 @@ describe('OpgpService', () => {
     })
   })
 
-  describe('configure (config?: OpenpgpConfig): Promise<OpenpgpConfig>', () => {
+  describe('configure (config?: Eventual<OpenpgpConfig>): Promise<OpenpgpConfig>', () => {
     let error: any
     let result: any
     beforeEach(() => {
@@ -149,7 +151,8 @@ describe('OpgpService', () => {
         .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
       })
-      it('returns a Promise that resolves to the current openpgp configuration', () => {
+      it('returns a Promise that resolves to the current openpgp configuration',
+      () => {
         expect(error).not.toBeDefined()
         expect(result).toEqual(openpgp.config)
       })
@@ -171,7 +174,8 @@ describe('OpgpService', () => {
         .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
       })
-      it('returns a Promise that resolves to the current openpgp configuration', () => {
+      it('returns a Promise that resolves to the current openpgp configuration',
+      () => {
         expect(error).not.toBeDefined()
         expect(result).toEqual({
           compression: 42,
@@ -183,8 +187,8 @@ describe('OpgpService', () => {
     })
   })
 
-  describe('generateKey (user: UserId[]|UserId, opts?: OpgpKeyOpts)' +
-  ': Promise<OpgpProxyKey>', () => {
+  describe('generateKey (user: Eventual<UserId[]|UserId>, ' +
+  'opts?: Eventual<OpgpKeyOpts)>: Promise<OpgpProxyKey>', () => {
     it('delegates to the openpgp primitive', (done) => {
       service.generateKey('john.doe@test.com', { passphrase: 'secret passphrase' })
       .catch(() => {}) // ignore
@@ -258,7 +262,7 @@ describe('OpgpService', () => {
     })
   })
 
-  describe('getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)' +
+  describe('getKeysFromArmor (armor: Eventual<string>, opts?: Eventual<OpgpKeyringOpts>)' +
   ': Promise<OpgpProxyKey[]|OpgpProxyKey>', () => {
 
     it('delegates to the openpgp primitive', (done) => {
@@ -361,7 +365,7 @@ describe('OpgpService', () => {
     })
   })
 
-  describe('getArmorFromKey (keyRef: KeyRef): Promise<string>', () => {
+  describe('getArmorFromKey (keyRef: Eventual<KeyRef>): Promise<string>', () => {
     describe('when given a valid key handle string', () => {
       let error: any
       let result: any
@@ -371,7 +375,7 @@ describe('OpgpService', () => {
       })
 
       beforeEach((done) => {
-        service.getArmorFromKey('valid-key-handle')
+        service.getArmorFromKey(Promise.resolve('valid-key-handle'))
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
@@ -453,8 +457,8 @@ describe('OpgpService', () => {
     })
   })
 
-  describe('unlock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts)' +
-  ': Promise<OpgpProxyKey>', () => {
+  describe('unlock (keyRef: Eventual<KeyRef>, passphrase: Eventual<string>, ' +
+  'opts?: Eventual<UnlockOpts>): Promise<OpgpProxyKey>', () => {
     describe('when given a valid handle string of a locked key ' +
     'and the correct passphrase', () => {
       let unlockedLiveKey: any
@@ -473,7 +477,7 @@ describe('OpgpService', () => {
       })
 
       beforeEach((done) => {
-        service.unlock('valid-key-handle', 'secret passphrase')
+        service.unlock(Promise.resolve('valid-key-handle'), 'secret passphrase')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
@@ -629,8 +633,8 @@ describe('OpgpService', () => {
     })
   })
 
-  describe('lock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts)' +
-  ': Promise<OpgpProxyKey>', () => {
+  describe('lock (keyRef: Eventual<KeyRef>, passphrase: Eventual<string>, ' +
+  'opts?: Eventual<UnlockOpts>): Promise<OpgpProxyKey>', () => {
     describe('when given a valid handle string of an unlocked key '
     + 'and a passphrase string', () => {
       let lockedLiveKey: any
@@ -649,7 +653,7 @@ describe('OpgpService', () => {
       })
 
       beforeEach((done) => {
-        service.lock('unlocked-key-handle', 'secret passphrase')
+        service.lock(Promise.resolve('unlocked-key-handle'), 'secret passphrase')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
@@ -781,8 +785,8 @@ describe('OpgpService', () => {
     })
   })
 
-  describe('encrypt (keyRefs: KeyRefMap, plain: string, opts?: EncryptOpts)' +
-  ': Promise<string>', () => {
+  describe('encrypt (keyRefs: Eventual<KeyRefMap>, plain: Eventual<string>, ' +
+  'opts?: Eventual<EncryptOpts>): Promise<string>', () => {
     describe('when given a valid plain text string, and valid handles of valid ' +
     'public cipher and private authentication keys', () => {
       let error: any
@@ -798,7 +802,7 @@ describe('OpgpService', () => {
           cipher: 'valid-cipher-key-handle',
           auth: 'valid-auth-key-handle'
         }
-        service.encrypt(refs, 'plain text')
+        service.encrypt(Promise.resolve(refs), 'plain text')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
@@ -949,8 +953,8 @@ describe('OpgpService', () => {
     })
   })
 
-  describe('decrypt (keyRefs: KeyRefMap, cipher: string, opts?: DecryptOpts)' +
-  ': Promise<string>', () => {
+  describe('decrypt (keyRefs: Eventual<KeyRefMap>, cipher: Eventual<string>, ' +
+  'opts?: Eventual<DecryptOpts>): Promise<string>', () => {
     let message: any
     beforeEach(() => {
       message = {}
@@ -972,7 +976,7 @@ describe('OpgpService', () => {
           cipher: 'valid-cipher-key-handle',
           auth: 'valid-auth-key-handle'
         }
-        service.decrypt(refs, 'cipher text')
+        service.decrypt(Promise.resolve(refs), 'cipher text')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
@@ -1129,8 +1133,8 @@ describe('OpgpService', () => {
     })
   })
 
-  describe('sign (keyRefs: KeyRef[]|KeyRef, text: string, opts?: SignOpts)' +
-  ': Promise<string>', () => {
+  describe('sign (keyRefs: Eventual<KeyRef[]|KeyRef>, text: Eventual<string>, ' +
+  'opts?: Eventual<SignOpts>): Promise<string>', () => {
     let message: any
     beforeEach(() => {
       message = jasmine.createSpyObj('message', [ 'sign', 'armor' ])
@@ -1148,7 +1152,7 @@ describe('OpgpService', () => {
       })
 
       beforeEach((done) => {
-        service.sign('valid-key-handle', 'plain text')
+        service.sign(Promise.resolve('valid-key-handle'), 'plain text')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
         .finally(() => setTimeout(done))
@@ -1244,8 +1248,8 @@ describe('OpgpService', () => {
     })
   })
 
-  describe('verify (keyRefs: KeyRef[]|KeyRef, armor: string, opts?: VerifyOpts)' +
-  ': Promise<string>', () => {
+  describe('verify (keyRefs: Eventual<KeyRef[]|KeyRef>, armor: Eventual<string>, ' +
+  'opts?: Eventual<VerifyOpts>): Promise<string>', () => {
     let message: any
     beforeEach(() => {
       message = jasmine.createSpyObj('message', [ 'verify', 'getText' ])
@@ -1263,7 +1267,7 @@ describe('OpgpService', () => {
       })
 
       beforeEach((done) => {
-        service.verify('valid-auth-key-handle', 'signed armor text')
+        service.verify(Promise.resolve('valid-auth-key-handle'), 'signed armor text')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
         .finally(() => setTimeout(done))

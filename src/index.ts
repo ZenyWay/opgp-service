@@ -17,7 +17,12 @@ import getProxyKey, { ProxyKeyFactory, OpgpProxyKey } from './proxy-key'
 import { isString, isNumber, isBoolean, isFunction } from './utils'
 import getCache, { CsrKeyCache } from 'csrkey-cache'
 import * as Promise from 'bluebird'
+import getResolve from 'resolve-call'
+const resolve = getResolve({ Promise: <any>Promise })
 import { __assign as assign } from 'tslib'
+
+export type Eventual<T> = T|PromiseLike<T>
+export type OneOrMore<T> = T[]|T
 
 export interface OpgpServiceFactory {
   (config?: OpgpServiceFactoryConfig): OpgpService
@@ -47,7 +52,7 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  configure (config?: OpenpgpConfig): Promise<OpenpgpConfig>
+  configure (config?: Eventual<OpenpgpConfig>): Promise<OpenpgpConfig>
 
   /**
    * @public
@@ -67,7 +72,7 @@ export interface OpgpService {
    *
    * @returns {Promise<OpgpProxyKey>}
    */
-  generateKey (user: UserId[]|UserId, opts?: OpgpKeyOpts): Promise<OpgpProxyKey>
+  generateKey (user: Eventual<OneOrMore<UserId>>, opts?: Eventual<OpgpKeyOpts>): Promise<OpgpProxyKey>
   /**
    * @public
    * @method
@@ -81,7 +86,7 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts): Promise<OpgpProxyKey[]|OpgpProxyKey>
+  getKeysFromArmor (armor: Eventual<string>, opts?: Eventual<OpgpKeyringOpts>): Promise<OneOrMore<OpgpProxyKey>>
   /**
    * @public
    * @method
@@ -93,7 +98,7 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  getArmorFromKey (keyRef: KeyRef): Promise<string>
+  getArmorFromKey (keyRef: Eventual<KeyRef>): Promise<string>
   /**
    * @public
    * @method
@@ -118,7 +123,7 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  unlock (keyRef: KeyRef, passphrase: string, opts?: UnlockOpts): Promise<OpgpProxyKey>
+  unlock (keyRef: Eventual<KeyRef>, passphrase: Eventual<string>, opts?: Eventual<UnlockOpts>): Promise<OpgpProxyKey>
   /**
    * @public
    * @method
@@ -154,7 +159,7 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  lock (keyRef: KeyRef, passphrase: string, opts?: LockOpts): Promise<OpgpProxyKey>
+  lock (keyRef: Eventual<KeyRef>, passphrase: Eventual<string>, opts?: Eventual<LockOpts>): Promise<OpgpProxyKey>
   /**
    * @public
    * @method
@@ -180,7 +185,7 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  encrypt (keyRefs: KeyRefMap, plain: string, opts?: EncryptOpts): Promise<string>
+  encrypt (keyRefs: Eventual<KeyRefMap>, plain: Eventual<string>, opts?: Eventual<EncryptOpts>): Promise<string>
   /**
    * @public
    * @method
@@ -206,7 +211,7 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  decrypt (keyRefs: KeyRefMap, cipher: string, opts?: DecryptOpts): Promise<string>
+  decrypt (keyRefs: Eventual<KeyRefMap>, cipher: Eventual<string>, opts?: Eventual<DecryptOpts>): Promise<string>
   /**
    * @public
    * @method
@@ -228,7 +233,7 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  sign (keyRefs: KeyRef[]|KeyRef, text: string, opts?: SignOpts): Promise<string>
+  sign (keyRefs: Eventual<OneOrMore<KeyRef>>, text: Eventual<string>, opts?: Eventual<SignOpts>): Promise<string>
   /**
    * @public
    * @method
@@ -251,12 +256,12 @@ export interface OpgpService {
    *
    * @memberOf OpgpService
    */
-  verify (keyRefs: KeyRef[]|KeyRef, armor: string, opts?: VerifyOpts): Promise<string>
+  verify (keyRefs: Eventual<OneOrMore<KeyRef>>, armor: Eventual<string>, opts?: Eventual<VerifyOpts>): Promise<string>
 }
 
 export interface KeyRefMap {
-  auth: KeyRef[]|KeyRef
-  cipher: KeyRef[]|KeyRef
+  auth: OneOrMore<KeyRef>
+  cipher: OneOrMore<KeyRef>
 }
 
 export type KeyRef = OpgpProxyKey|string
@@ -413,7 +418,7 @@ const OPGP_KEY_DEFAULTS = {
   unlocked: false
 }
 
-class OpgpServiceClass implements OpgpService {
+class OpgpServiceClass {
   static getInstance: OpgpServiceFactory =
   function (config?: OpgpServiceFactoryConfig): OpgpService {
     const spec = assign({}, config)
@@ -425,7 +430,7 @@ class OpgpServiceClass implements OpgpService {
     new OpgpServiceClass(cache, getLiveKey, spec.getProxyKey || getProxyKey, openpgp)
 
     return OpgpServiceClass.PUBLIC_METHODS.reduce((service, method) => {
-      service[method] = instance[method].bind(instance)
+      service[method] = resolve(instance[method]).bind(instance)
       return service
     }, <OpgpService> {})
   }
@@ -435,7 +440,7 @@ class OpgpServiceClass implements OpgpService {
     return Promise.resolve(assign({}, openpgp.config))
   }
 
-  generateKey (user: UserId[]|UserId, opts?: OpgpKeyOpts): Promise<OpgpProxyKey> {
+  generateKey (user: OneOrMore<UserId>, opts?: OpgpKeyOpts): Promise<OpgpProxyKey> {
     return !isValidUser(user) ? reject('invalid user')
     : !isValidKeyOpts(opts) ? reject('invalid key options')
     : Promise.try(() =>  this.openpgp.key.generate(toKeySpec(user, opts)))
@@ -443,7 +448,7 @@ class OpgpServiceClass implements OpgpService {
   }
 
   getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)
-  : Promise<OpgpProxyKey[]|OpgpProxyKey> {
+  : Promise<OneOrMore<OpgpProxyKey>> {
   	return !isString(armor) ? reject('invalid armor: not a string')
     : Promise.try(() => {
     	const keys = this.openpgp.key.readArmored(armor).keys
@@ -497,7 +502,7 @@ class OpgpServiceClass implements OpgpService {
     .get('data')
   }
 
-  sign (keyRefs: KeyRef[]|KeyRef, text: string, opts?: SignOpts): Promise<string> {
+  sign (keyRefs: OneOrMore<KeyRef>, text: string, opts?: SignOpts): Promise<string> {
   	return Promise.try(() => {
       const keys = this.getCachedOpenpgpKeys(keyRefs)
 
@@ -508,7 +513,7 @@ class OpgpServiceClass implements OpgpService {
     })
   }
 
-  verify (keyRefs: KeyRef[]|KeyRef, armor: string, opts?: VerifyOpts): Promise<string> {
+  verify (keyRefs: OneOrMore<KeyRef>, armor: string, opts?: VerifyOpts): Promise<string> {
   	return Promise.try(() => {
       const keys = this.getCachedOpenpgpKeys(keyRefs)
 

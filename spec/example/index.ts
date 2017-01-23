@@ -13,9 +13,13 @@
  */
 ;
 import getService, { OpgpProxyKey } from '../../src'
-import * as Promise from 'bluebird'
+import getResolve from 'resolve-call'
+const resolve = getResolve()
 import fs = require('fs')
-const log = console.log.bind(console)
+import debug = require('debug')
+const log = resolve(debug('example:'))
+
+const toKeyRing = resolve((key: OpgpProxyKey) => ({ cipher: key, auth: key }))
 
 const service = getService() // use defaults
 
@@ -24,18 +28,13 @@ const passphrase = 'passphrase to decrypt private key'
 const secret = 'rob says wow!'
 
 log('import key...')
-const key = <Promise<OpgpProxyKey>> service.getKeysFromArmor(armor)
-.tap(() => log('key successfully imported!\nnow unlock key...'))
-
-const unlocked = key.then(key => service.unlock(key, passphrase))
-.tap(() => log(`key successfully unlocked!\nnow encrypt then decrypt '${secret}'...`))
+const key = service.getKeysFromArmor(armor)
+const keys = toKeyRing(service.unlock(key, passphrase))
 
 // encrypt with public key, sign with private
-const cipher = unlocked
-.then(key => service.encrypt({ cipher: key, auth: key }, secret))
-.tap(log) // '-----BEGIN PGP MESSAGE----- ... -----END PGP MESSAGE-----'
+const cipher = service.encrypt(keys, secret)
+log(cipher) // '-----BEGIN PGP MESSAGE----- ... -----END PGP MESSAGE-----'
 
 // decrypt with decrypted private key, verify signature with public
-const plain = Promise.join(unlocked, cipher,
-(key, cipher) => service.decrypt({ cipher: key, auth: key }, cipher))
-.tap(log) // 'rob says wow!'
+const plain = service.decrypt(keys, cipher)
+log(plain) // 'rob says wow!'

@@ -37,40 +37,22 @@ when a key is locked, all proxies to the unlocked state become stale.
 key proxies always represent a key in an immutable state.
 this hinders coupling in client code through the service API.
 
-## fully async
-async all the way streamlines error-control flow:
+## fully async: reads like sync
+async all the way makes it easy to write code that [reads like synchronous code](https://www.npmjs.com/package/resolve-call),
+and streamlines error-control flow.
 * all API methods return a `Promise`.
 * any exception thrown by `openpgp` is converted into a rejected `Promise`.
 
-# <a name="api"></a> API 2.0 stable
-the current version exposes the following service methods:
-* configure
-* generateKey, getKeysFromArmor, getArmorFromKey
-* unlock, lock
-* encrypt, decrypt
-* sign, verify
-
-for a detailed specification of the API
-* run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.0.0/spec/web/index.html)
-in your browser,
-* or check the [public interface declaration](https://github.com/ZenyWay/opgp-service/blob/master/src/index.ts#L22-L234)
-in the source code.
-
 # <a name="example"></a> EXAMPLE
-a live version of this example can be viewed [here](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.0.0/spec/example/index.html)
-in the browser console,
-or by cloning this repository and running the following commands from a terminal:
-```bash
-npm install
-npm run example
-```
-the files of this example are available [here](./spec/example).
-
 ```javascript
 import getService from 'opgp-service'
-import * as Promise from 'bluebird'
+import getResolve from 'resolve-call'
+const resolve = getResolve()
 import fs = require('fs')
-const log = console.log.bind(console)
+import debug = require('debug')
+const log = resolve(debug('example:'))
+
+const toKeyRing = resolve((key: OpgpProxyKey) => ({ cipher: key, auth: key }))
 
 const service = getService() // use defaults
 
@@ -80,22 +62,45 @@ const secret = 'rob says wow!'
 
 log('import key...')
 const key = service.getKeysFromArmor(armor)
-.tap(() => log('key successfully imported!\nnow unlock key...'))
-
-const unlocked = key.then(key => service.unlock(key, passphrase))
-.tap(() => log('key successfully unlocked!\nnow encrypt then decrypt `${secret}`...'))
+const keys = toKeyRing(service.unlock(key, passphrase))
 
 // encrypt with public key, sign with private
-const cipher = unlocked
-.then(key => service.encrypt({ cipher: key, auth: key }, secret))
-.tap(log) // '-----BEGIN PGP MESSAGE----- ... -----END PGP MESSAGE-----'
+const cipher = service.encrypt(keys, secret)
+log(cipher) // '-----BEGIN PGP MESSAGE----- ... -----END PGP MESSAGE-----'
 
 // decrypt with private key, verify signature with public
-const plain = Promise.join(unlocked, cipher)
-.then(([key, cipher]) => service.decrypt({ cipher: key, auth: key }, cipher))
-.tap(log) // 'rob says wow!'
-.catch(log)
+const plain = service.decrypt(keys, cipher)
+log(plain) // 'rob says wow!'
 ```
+note that although the above code reads like synchronous code,
+it is in fact fully async.
+the files of this example are available [here](./spec/example).
+
+a live version of this example can be viewed [here](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.1.0/spec/example/index.html)
+in the browser console,
+or by cloning this repository and running the following commands from a terminal:
+```bash
+npm install
+npm run example
+```
+
+# <a name="api"></a> API 2.0 stable
+the current version exposes the following service methods:
+* configure
+* generateKey, getKeysFromArmor, getArmorFromKey
+* unlock, lock
+* encrypt, decrypt
+* sign, verify
+
+all methods accept arguments that may be either immediately available,
+or a Promise that eventually resolves, and return a Promise,
+as demonstrated in the above example.
+
+for a detailed specification of the API
+* run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.1.0/spec/web/index.html)
+in your browser,
+* or check the [public interface declaration](./src/index.ts#L24-L414)
+in the source code.
 
 # <a name="contributing"></a> CONTRIBUTING
 see the [contribution guidelines](./CONTRIBUTING.md)
