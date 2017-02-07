@@ -82,6 +82,12 @@ export interface OpgpLiveKey {
    */
   armor (): Promise<string>
   /**
+   * @returns {Promise<OpgpLiveKey>} public component of this key.
+   *
+   * @memberOf LiveKey
+   */
+  toPublicKey (): Promise<OpgpLiveKey>
+  /**
    *
    * @param {string} passphrase
    * @param {LiveKeyUnlockOpts} [opts]
@@ -166,6 +172,13 @@ class LiveKeyClass implements OpgpLiveKey {
 
   armor (): Promise<string> {
     return Promise.try(() => this.key.armor())
+  }
+
+  toPublicKey (): Promise<OpgpLiveKey> {
+    return this.bp.isPublic
+    ? Promise.resolve(this)
+    : Promise.try(() => this.key.toPublic())
+    .then(key => new LiveKeyClass(this.utils, key, this.utils.getKeyBlueprint(key)))
   }
 
   unlock (passphrase: string, opts?: LiveKeyUnlockOpts): Promise<OpgpLiveKey> {

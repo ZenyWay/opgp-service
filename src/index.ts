@@ -77,6 +77,17 @@ export interface OpgpService {
    * @public
    * @method
    *
+   * @param {KeyRef} keyRef
+   *
+   * @error {Error} 'invalid or stale key reference'
+   *
+   * @returns {Promise<OpgpProxyKey>} public component of the given key.
+   */
+  getPublicKey (keyRef: KeyRef): Promise<OpgpProxyKey>
+  /**
+   * @public
+   * @method
+   *
    * @param {string} armor
    * @param {OpgpKeyringOpts} [opts] ignored
    *
@@ -447,6 +458,13 @@ class OpgpServiceClass {
     .then((key: any) => this.cacheAndProxyKey(this.getLiveKey(key)))
   }
 
+  getPublicKey (keyRef: KeyRef): Promise<OpgpProxyKey> {
+    return Promise.try(() => this.getCachedLiveKey(keyRef))
+    .then(key => key.bp.isPublic
+    ? this.getProxyKey(<string>getHandle(keyRef), key.bp) // handle is available after this#getCachedLiveKey
+    : key.toPublicKey().then(key => this.cacheAndProxyKey(key))) // cache a new public ProxyKey instance
+  }
+
   getKeysFromArmor (armor: string, opts?: OpgpKeyringOpts)
   : Promise<OneOrMore<OpgpProxyKey>> {
   	return !isString(armor) ? reject('invalid armor: not a string')
@@ -543,6 +561,7 @@ class OpgpServiceClass {
   private static PUBLIC_METHODS = [
     'configure',
     'generateKey',
+    'getPublicKey',
     'getKeysFromArmor',
     'getArmorFromKey',
     'unlock',

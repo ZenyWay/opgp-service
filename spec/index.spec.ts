@@ -38,6 +38,7 @@ beforeEach(() => { // mock dependencies
     key: {},
     bp: { keys: [ { id: 'key-id' } ], user: { ids: [] } },
     armor: jasmine.createSpy('armor'),
+    toPublicKey: jasmine.createSpy('toPublicKey'),
     lock: jasmine.createSpy('lock'),
     unlock: jasmine.createSpy('unlock')
   }
@@ -47,16 +48,15 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
 'OpgpService', () => {
   let opgpService: any
   beforeEach(() => {
-    opgpService = jasmine.objectContaining({
-      configure: jasmine.any(Function),
-      generateKey: jasmine.any(Function),
-      getKeysFromArmor: jasmine.any(Function),
-      getArmorFromKey: jasmine.any(Function),
-      encrypt: jasmine.any(Function),
-      decrypt: jasmine.any(Function),
-      sign: jasmine.any(Function),
-      verify: jasmine.any(Function)
-    })
+    const methods = [
+      'configure', 'generateKey', 'getPublicKey', 'getKeysFromArmor',
+      'getArmorFromKey', 'encrypt', 'decrypt', 'sign', 'verify'
+    ]
+    opgpService =
+    jasmine.objectContaining(methods.reduce((methods: any, method) => {
+      methods[method] = jasmine.any(Function)
+      return methods
+    }, {}))
   })
 
   describe('when called without arguments', () => {
@@ -259,6 +259,143 @@ describe('OpgpService', () => {
 
     describe('OgpgKeyOpts', () => {
       // TODO
+    })
+  })
+
+  describe('getPublicKey (keyRef: Eventual<KeyRef>): Promise<OpgpProxyKey>', () => {
+    let publickey: any
+    beforeEach(() => {
+      publickey = {
+        key: {},
+        bp: { isPublic: true, keys: [ { id: 'key-id' } ], user: { ids: [] } }
+      }
+    })
+    describe('when given a valid private key handle string', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(livekey)
+        cache.set.and.returnValue('public-key-handle')
+        livekey.toPublicKey.and.returnValue(Promise.resolve(publickey))
+      })
+
+      beforeEach((done) => {
+        service.getPublicKey(Promise.resolve('valid-private-key-handle'))
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instance referenced by the given handle',
+      () => {
+        expect(cache.get).toHaveBeenCalledWith('valid-private-key-handle')
+      })
+
+      it('delegates to the retrieved {OpgpLiveKey} instance', () => {
+        expect(livekey.toPublicKey).toHaveBeenCalledWith()
+      })
+
+      it('stores the new public {OpgpLiveKey} instance in the underlying cache',
+      () => {
+        expect(cache.set).toHaveBeenCalledWith(publickey)
+      })
+
+      it('returns a Promise that resolves to a {OpgpProxyKey} instance ' +
+      'of the public component of the referenced {OpgpLiveKey} instance', () => {
+        expect(result).toEqual(jasmine.objectContaining({ handle: 'public-key-handle' }))
+        expect(result).toEqual(jasmine.objectContaining(livekey.bp))
+        expect(error).not.toBeDefined()
+      })
+    })
+
+    describe('when given a valid public key handle string', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(publickey)
+      })
+
+      beforeEach((done) => {
+        service.getPublicKey(Promise.resolve('valid-private-key-handle'))
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instance referenced by the given handle',
+      () => {
+        expect(cache.get).toHaveBeenCalledWith('valid-private-key-handle')
+      })
+
+      it('does not delegate to the retrieved {OpgpLiveKey} instance', () => {
+        expect(livekey.toPublicKey).not.toHaveBeenCalled()
+      })
+
+      it('returns a Promise that resolves to ' +
+      'the referenced {OpgpLiveKey} instance', () => {
+        expect(result).toEqual(jasmine.objectContaining({ handle: 'valid-private-key-handle' }))
+        expect(result).toEqual(jasmine.objectContaining(publickey.bp))
+        expect(error).not.toBeDefined()
+      })
+    })
+
+    describe('when given a stale or invalid handle', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(undefined)
+      })
+
+      beforeEach((done) => {
+        service.getPublicKey('stale-key-handle')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('attempts to retrieve the {OpgpLiveKey} instance ' +
+      'referenced by the given handle', () => {
+        expect(cache.get).toHaveBeenCalledWith('stale-key-handle')
+      })
+
+      it('returns a Promise that rejects ' +
+      'with an `invalid key reference: not a string or stale` {Error}', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toEqual(jasmine.any(Error))
+        expect(error.message).toBe('invalid key reference: not a string or stale')
+      })
+    })
+
+    describe('when the {OpgpLiveKey#toPublicKey} method rejects with an {Error}', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(livekey)
+        livekey.toPublicKey.and.returnValue(Promise.reject(new Error('boom')))
+      })
+
+      beforeEach((done) => {
+        service.getPublicKey('valid-key-handle')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instance referenced by the given handle',
+      () => {
+        expect(cache.get).toHaveBeenCalledWith('valid-key-handle')
+      })
+
+      it('delegates to the retrieved {OpgpLiveKey} instance', () => {
+        expect(livekey.toPublicKey).toHaveBeenCalledWith()
+      })
+
+      it('returns a Promise that rejects with the {Error} ' +
+      'from the {OpgpLiveKey#armor} method', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toEqual(jasmine.any(Error))
+        expect(error.message).toBe('boom')
+      })
     })
   })
 

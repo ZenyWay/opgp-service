@@ -22,7 +22,8 @@ let subkeys: any
 let packets: any
 let msg: any
 let blueprint: any
-let cloneKey: any
+let livekeyInterface: any
+let cloneKey: (key: any) => any
 
 beforeEach(() => { // mock dependencies
   openpgp = {
@@ -33,6 +34,7 @@ beforeEach(() => { // mock dependencies
 
   key = jasmine.createSpyObj('key', [
     'armor',
+    'toPublic',
     'getAllKeyPackets',
     'isPublic',
     'getUserIds',
@@ -96,6 +98,16 @@ beforeEach(() => { // mock dependencies
   openpgp.message.readArmored.and.returnValue(msg)
   openpgp.message.fromText.and.returnValue(msg)
 
+  livekeyInterface = {
+    key: key,
+    bp: jasmine.any(Object),
+    armor: jasmine.any(Function),
+    unlock: jasmine.any(Function),
+    lock: jasmine.any(Function),
+    sign: jasmine.any(Function),
+    verify: jasmine.any(Function)
+  }
+
   blueprint = { // expected
     isLocked: true,
     isPublic: false,
@@ -130,15 +142,7 @@ describe('LiveKeyFactory: ' +
   })
 
   it('returns a {OpgpLiveKey} instance that wraps the given openpgp key', () => {
-    expect(livekey).toEqual(jasmine.objectContaining({
-      key: key,
-      bp: jasmine.any(Object),
-      armor: jasmine.any(Function),
-      unlock: jasmine.any(Function),
-      lock: jasmine.any(Function),
-      sign: jasmine.any(Function),
-      verify: jasmine.any(Function)
-    }))
+    expect(livekey).toEqual(jasmine.objectContaining(livekeyInterface))
   })
 })
 
@@ -198,6 +202,79 @@ describe('OpgpLiveKey', () => {
       it('returns a Promise that rejects with the error ' +
       'from the openpgp primitive when it fails', () => {
         expect(key.armor).toHaveBeenCalled()
+        expect(result).not.toBeDefined()
+        expect(error).toBeDefined()
+        expect(error.message).toBe('boom')
+      })
+    })
+  })
+
+  describe('toPublicKey (): Promise<OpgpLiveKey>', () => {
+    let publickey: any
+    beforeEach(() => {
+      publickey = cloneKey(key)
+      publickey.isPublic = jasmine.createSpy('armor').and.returnValue(true)
+    })
+    describe('when this {LiveKey} wraps a private openpgp key', () => {
+      let error: any
+      let result: any
+      beforeEach((done) => {
+        livekeyInterface.key = publickey
+        key.toPublic.and.returnValue(publickey)
+        livekey.toPublicKey()
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('delegates to the underlying openpgp primitive', () => {
+        expect(key.toPublic).toHaveBeenCalledWith()
+      })
+
+      it('returns a Promise that resolves to a {OpgpLiveKey} instance ' +
+      'that wraps the public openpgp key of the wrapped openpgp key of this {LiveKey}',
+      () => {
+        expect(result).toEqual(jasmine.objectContaining(livekeyInterface))
+        expect(error).not.toBeDefined()
+      })
+    })
+
+    describe('when this {LiveKey} wraps a public openpgp key', () => {
+      let error: any
+      let result: any
+      let publicLivekey: any
+      beforeEach((done) => {
+        publicLivekey = getLiveKey(publickey)
+        publicLivekey.toPublicKey()
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('does not delegate to the underlying openpgp primitive', () => {
+        expect(key.toPublic).not.toHaveBeenCalled()
+      })
+
+      it('returns this {OpgpLiveKey} instance ', () => {
+        expect(result).toEqual(publicLivekey)
+        expect(error).not.toBeDefined()
+      })
+    })
+
+    describe('when the openpgp primitive fails', () => {
+      let error: any
+      let result: any
+      beforeEach((done) => {
+        key.toPublic.and.throwError('boom')
+        livekey.toPublicKey()
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('returns a Promise that rejects with the error ' +
+      'from the openpgp primitive', () => {
+        expect(key.toPublic).toHaveBeenCalled()
         expect(result).not.toBeDefined()
         expect(error).toBeDefined()
         expect(error.message).toBe('boom')
