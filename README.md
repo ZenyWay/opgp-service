@@ -89,7 +89,7 @@ npm run example
 # <a name="api"></a> API 2.2 stable
 the current version exposes the following service methods:
 * configure
-* generateKey, getKeysFromArmor, getArmorFromKey
+* generateKey, getPublicKey, getKeysFromArmor, getArmorFromKey
 * unlock, lock
 * encrypt, decrypt
 * sign, verify
@@ -104,7 +104,7 @@ in the source code.
 see the [contribution guidelines](./CONTRIBUTING.md)
 
 # <a name="license"></a> LICENSE
-Copyright 2016 Stéphane M. Catala
+Copyright 2017 Stéphane M. Catala
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
