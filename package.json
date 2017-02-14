@@ -45,6 +45,7 @@
   },
   "homepage": "https://github.com/zenyway/opgp-service#readme",
   "dependencies": {
+    "@types/base64-js": "^1.2.5",
     "@types/bluebird": "^3.0.37",
     "base64-js": "^1.2.0",
     "bluebird": "^3.4.7",
@@ -54,7 +55,6 @@
     "tslib": "^1.5.0"
   },
   "devDependencies": {
-    "@types/base64-js": "^1.2.5",
     "@types/debug": "0.0.29",
     "@types/jasmine": "^2.5.40",
     "@types/node": "^7.0.0",
