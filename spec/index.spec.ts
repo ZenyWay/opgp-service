@@ -187,6 +187,58 @@ describe('OpgpService', () => {
     })
   })
 
+  describe('getPublicKey (keyRef: Eventual<KeyRef>): Promise<OpgpProxyKey>', () => {
+    describe('when given a valid private key handle string', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(livekey)
+      })
+
+      beforeEach((done) => {
+        service.isValidKeyHandle(Promise.resolve('valid-key-handle'))
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instance referenced by the given handle',
+      () => {
+        expect(cache.get).toHaveBeenCalledWith('valid-key-handle')
+      })
+
+      it('returns a Promise that resolves to `true`', () => {
+        expect(result).toBe(true)
+        expect(error).not.toBeDefined()
+      })
+    })
+
+    describe('when given a stale or invalid handle', () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        cache.get.and.returnValue(undefined)
+      })
+
+      beforeEach((done) => {
+        service.isValidKeyHandle('stale-key-handle')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('attempts to retrieve the {OpgpLiveKey} instance ' +
+      'referenced by the given handle', () => {
+        expect(cache.get).toHaveBeenCalledWith('stale-key-handle')
+      })
+
+      it('returns a Promise that resolves to `false`', () => {
+        expect(result).toBe(false)
+        expect(error).not.toBeDefined()
+      })
+    })
+  })
+
   describe('generateKey (user: Eventual<UserId[]|UserId>, ' +
   'opts?: Eventual<OpgpKeyOpts)>: Promise<OpgpProxyKey>', () => {
     it('delegates to the openpgp primitive', (done) => {

@@ -89,7 +89,7 @@ npm run example
 # <a name="api"></a> API 2.3 stable
 the current version exposes the following service methods:
 * configure
-* generateKey, getPublicKey, getKeysFromArmor, getArmorFromKey
+* isValidKeyHandle, generateKey, getPublicKey, getKeysFromArmor, getArmorFromKey
 * unlock, lock
 * encrypt, decrypt
 * sign, verify
@@ -97,7 +97,7 @@ the current version exposes the following service methods:
 for a detailed specification of the API
 * run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.3.0/spec/web/index.html)
 in your browser,
-* or check the [public interface declaration](./src/index.ts#L24-L414)
+* or check the [public interface declaration](./src/index.ts#L38-L271)
 in the source code.
 
 # <a name="contributing"></a> CONTRIBUTING

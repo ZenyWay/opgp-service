@@ -58,6 +58,18 @@ export interface OpgpService {
    * @public
    * @method
    *
+   * @param {Eventual<KeyRef>} keyRef
+   *
+   * @returns {boolean} `true` when the given key reference
+   * corresponds to a valid cached {OpgpLiveKey},
+   * `false` otherwise.
+   */
+  isValidKeyHandle (keyRef: Eventual<KeyRef>): Promise<boolean>
+
+  /**
+   * @public
+   * @method
+   *
    * Generate a new OpenPGP key pair.
    * Currently only supports RSA keys.
    * Primary and subkey will be of same type.
@@ -77,13 +89,13 @@ export interface OpgpService {
    * @public
    * @method
    *
-   * @param {KeyRef} keyRef
+   * @param {Eventual<KeyRef>} keyRef
    *
    * @error {Error} 'invalid or stale key reference'
    *
    * @returns {Promise<OpgpProxyKey>} public component of the given key.
    */
-  getPublicKey (keyRef: KeyRef): Promise<OpgpProxyKey>
+  getPublicKey (keyRef: Eventual<KeyRef>): Promise<OpgpProxyKey>
   /**
    * @public
    * @method
@@ -451,6 +463,12 @@ class OpgpServiceClass {
     return Promise.resolve({ ...openpgp.config })
   }
 
+  isValidKeyHandle (keyRef: KeyRef): Promise<boolean> {
+    return Promise.try(() => this.getCachedLiveKey(keyRef))
+    .catch(err => false)
+    .then(Boolean)
+  }
+
   generateKey (user: OneOrMore<UserId>, opts?: OpgpKeyOpts): Promise<OpgpProxyKey> {
     return !isValidUser(user) ? reject('invalid user')
     : !isValidKeyOpts(opts) ? reject('invalid key options')
@@ -560,6 +578,7 @@ class OpgpServiceClass {
 
   private static PUBLIC_METHODS = [
     'configure',
+    'isValidKeyHandle',
     'generateKey',
     'getPublicKey',
     'getKeysFromArmor',
