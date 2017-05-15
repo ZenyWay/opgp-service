@@ -79,7 +79,7 @@ it is in fact fully async.
 
 the files of this example are available [in the `example` folder](./spec/example).
 
-a live version of this example can be viewed [in the browser console](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.3.0/spec/example/index.html),
+a live version of this example can be viewed [in the browser console](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.3.1/spec/example/index.html),
 or by cloning this repository and running the following commands from a terminal:
 ```bash
 npm install
@@ -95,7 +95,7 @@ the current version exposes the following service methods:
 * sign, verify
 
 for a detailed specification of the API
-* run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.3.0/spec/web/index.html)
+* run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.3.1/spec/web/index.html)
 in your browser,
 * or check the [public interface declaration](./src/index.ts#L38-L271)
 in the source code.

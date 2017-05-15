@@ -17,6 +17,7 @@ import getResolve from 'resolve-call'
 const resolve = getResolve()
 import fs = require('fs')
 import debug = require('debug')
+debug.enable('example:*')
 const log = resolve(debug('example:'))
 
 const toKeyRing = resolve((key: OpgpProxyKey) => ({ cipher: key, auth: key }))
