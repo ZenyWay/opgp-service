@@ -16,7 +16,6 @@ import { OpgpKeyBlueprint, OpgpKeyId } from './proxy-key'
 import { isString } from './utils'
 import * as base64 from 'base64-js'
 import Promise = require('bluebird')
-import { __assign as assign } from 'tslib'
 
 export interface LiveKeyFactoryBuilder {
   (config: LiveKeyFactoryConfig): LiveKeyFactory
@@ -373,10 +372,12 @@ class OpenpgpKeyUtils {
    * @memberOf OpenpgpKeyUtils
    */
   private getPrimaryOpgpKeyId (key: any, packet: any): OpgpKeyId {
-    return assign(this.getHashes(packet), this.getPrimaryKeyType(key), {
+    return {
+      ...this.getHashes(packet),
+      ...this.getPrimaryKeyType(key),
       status: key.verifyPrimaryKey(),
       expires: getExpiry(key)
-    })
+    }
   }
 
   /**
@@ -394,12 +395,12 @@ class OpenpgpKeyUtils {
   private getSubkeyOpgpKeyId (key: any, packet: any, index: number): OpgpKeyId {
     const subkey = key.subKeys[index]
 
-    return assign(this.getHashes(packet), {
+    return { ...this.getHashes(packet),
       isCiph: subkey.isValidEncryptionKey(key.primaryKey),
       isAuth: subkey.isValidSigningKey(key.primaryKey),
       status: subkey.verify(key.primaryKey),
       expires: getExpiry(subkey)
-    })
+    }
   }
 }
 

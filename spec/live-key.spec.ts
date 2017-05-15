@@ -87,7 +87,7 @@ beforeEach(() => { // mock dependencies
   key.subKeys = subkeys
 
   cloneKey = function (key: any): any {
-    const clone = Object.assign({}, key)
+    const clone = { ...key }
     clone.primaryKey = { isDecrypted: key.primaryKey.isDecrypted }
     clone.subKeys = key.subKeys.slice()
     return clone

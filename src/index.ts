@@ -432,7 +432,7 @@ const OPGP_KEY_DEFAULTS = {
 class OpgpServiceClass {
   static getInstance: OpgpServiceFactory =
   function (config?: OpgpServiceFactoryConfig): OpgpService {
-    const spec = assign({}, config)
+    const spec = { ...config}
     const cache = spec.cache || getCache<OpgpLiveKey>()
     const openpgp = getOpenpgp(spec.openpgp)
     const getLiveKey = spec.getLiveKey || getLiveKeyFactory({ openpgp: openpgp })
@@ -448,7 +448,7 @@ class OpgpServiceClass {
 
   configure (config?: OpenpgpConfig): Promise<OpenpgpConfig> {
     const openpgp = configureOpenpgp(this.openpgp, config)
-    return Promise.resolve(assign({}, openpgp.config))
+    return Promise.resolve({ ...openpgp.config })
   }
 
   generateKey (user: OneOrMore<UserId>, opts?: OpgpKeyOpts): Promise<OpgpProxyKey> {
@@ -758,9 +758,9 @@ function isOpenpgp (val: any): boolean {
  * configured with the given {OpenpgpConfig} objects.
  */
 function configureOpenpgp (openpgp: any, ...configs: OpenpgpConfig[]): any {
-  const args = [ openpgp.config ].concat(configs.map(toValidOpenpgpConfig))
-  assign.apply(Object, args)
-  return openpgp
+const args = [ openpgp.config ].concat(configs.map(toValidOpenpgpConfig))
+assign.apply(Object, args)
+return openpgp
 }
 
 const OPENPGP_CONFIG_INTERFACE = {
@@ -826,7 +826,7 @@ interface OpenpgpKeySpec {
 }
 
 function toKeySpec (user: UserId[]|UserId, opts: OpgpKeyOpts) {
-  const config = assign({ user: [].concat(user) }, OPGP_KEY_DEFAULTS, opts)
+  const config = { user: [].concat(user), ...OPGP_KEY_DEFAULTS, ...opts }
   const spec = <OpenpgpKeySpec> {
     userIds: config.user,
     numBits: config.size,

@@ -79,14 +79,14 @@ it is in fact fully async.
 
 the files of this example are available [in the `example` folder](./spec/example).
 
-a live version of this example can be viewed [in the browser console](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.2.0/spec/example/index.html),
+a live version of this example can be viewed [in the browser console](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.3.0/spec/example/index.html),
 or by cloning this repository and running the following commands from a terminal:
 ```bash
 npm install
 npm run example
 ```
 
-# <a name="api"></a> API 2.2 stable
+# <a name="api"></a> API 2.3 stable
 the current version exposes the following service methods:
 * configure
 * generateKey, getPublicKey, getKeysFromArmor, getArmorFromKey
@@ -95,7 +95,7 @@ the current version exposes the following service methods:
 * sign, verify
 
 for a detailed specification of the API
-* run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.2.0/spec/web/index.html)
+* run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.3.0/spec/web/index.html)
 in your browser,
 * or check the [public interface declaration](./src/index.ts#L24-L414)
 in the source code.
