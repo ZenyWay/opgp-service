@@ -12,7 +12,8 @@
       "node"
     ],
     "sourceMap": true,
-    "noEmitHelpers": true,
+    "noEmitHelpers": false,
+    "importHelpers": false,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "removeComments": true,

@@ -1,5 +1,7 @@
-/*
- * Copyright 2017 Stephane M. Catala
+/**
+ * Copyright 2018 Stephane M. Catala
+ * @author Stephane M. Catala
+ * @license Apache@2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -11,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * Limitations under the License.
  */
-;
+//
 import getService from '../src'
 import Promise = require('bluebird')
 
 let cache: any
 let getLiveKey: any
 let getProxyKey: any
-let openpgp: any
+let openpgp: any // API from openpgp@3.1.2
 let livekey: any
 let types: any
 
@@ -65,7 +67,7 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
       service = getService()
     })
 
-    it('returns an {OpgpService} instance', () =>{
+    it('returns an {OpgpService} instance', () => {
       expect(service).toEqual(opgpService)
     })
   })
@@ -76,7 +78,7 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
     let service: any
     beforeEach(() => {
       openpgp.key.readArmored.and.returnValue({ keys: [ livekey.key ] })
-      getLiveKey.and.returnValue(livekey)
+      getLiveKey.and.returnValue(Promise.resolve(livekey))
       cache.set.and.returnValue('key-handle')
     })
 
@@ -92,7 +94,7 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
       .catch(() => setTimeout(done.fail))
     })
 
-    it('returns an {OpgpService} instance based on the given dependencies ', () =>{
+    it('returns an {OpgpService} instance based on the given dependencies ', () => {
       expect(service).toEqual(opgpService)
       expect(openpgp.key.readArmored).toHaveBeenCalledWith('key-armor')
       expect(getLiveKey).toHaveBeenCalledWith(livekey.key)
@@ -117,7 +119,7 @@ describe('default export: getOpgpService (config?: OpgpServiceFactoryConfig): ' 
     })
 
     it('returns an {OpgpService} instance based on an openpgp instance ' +
-    'with the given configuration', () =>{
+    'with the given configuration', () => {
       expect(error).not.toBeDefined()
       expect(result).toEqual(jasmine.objectContaining({ debug: true }))
     })
@@ -243,7 +245,7 @@ describe('OpgpService', () => {
   'opts?: Eventual<OpgpKeyOpts)>: Promise<OpgpProxyKey>', () => {
     it('delegates to the openpgp primitive', (done) => {
       service.generateKey('john.doe@test.com', { passphrase: 'secret passphrase' })
-      .catch(() => {}) // ignore
+      .catch(() => { /* no operation */ }) // ignore
       .finally(() => {
         expect(openpgp.key.generate).toHaveBeenCalledWith(jasmine.objectContaining({
           userIds: jasmine.arrayContaining([ 'john.doe@test.com' ]),
@@ -261,7 +263,7 @@ describe('OpgpService', () => {
       let result: any
       beforeEach(() => {
         openpgp.key.generate.and.returnValue(Promise.resolve(livekey.key))
-        getLiveKey.and.returnValue(livekey)
+        getLiveKey.and.returnValue(Promise.resolve(livekey))
         cache.set.and.returnValue('key-handle')
       })
 
@@ -456,7 +458,7 @@ describe('OpgpService', () => {
 
     it('delegates to the openpgp primitive', (done) => {
       service.getKeysFromArmor('key-armor')
-      .catch(() => {}) // ignore
+      .catch(() => { /* no operation */ }) // ignore
       .finally(() => {
         expect(openpgp.key.readArmored).toHaveBeenCalledWith('key-armor')
         setTimeout(done)
@@ -468,7 +470,7 @@ describe('OpgpService', () => {
       let result: any
       beforeEach(() => {
         openpgp.key.readArmored.and.returnValue({ keys: [ livekey.key ] })
-        getLiveKey.and.returnValue(livekey)
+        getLiveKey.and.returnValue(Promise.resolve(livekey))
         cache.set.and.returnValue('key-handle')
       })
 
@@ -500,7 +502,7 @@ describe('OpgpService', () => {
       let result: any
       beforeEach(() => {
         openpgp.key.readArmored.and.returnValue({ keys: [ livekey.key, livekey.key ] })
-        getLiveKey.and.returnValue(livekey)
+        getLiveKey.and.returnValue(Promise.resolve(livekey))
         cache.set.and.returnValue('key-handle') // would normally return unique values for each stored key
       })
 
@@ -1185,7 +1187,7 @@ describe('OpgpService', () => {
         .toHaveBeenCalledWith(jasmine.objectContaining({
           message: message,
           publicKeys: [ livekey.key ],
-          privateKey: livekey.key
+          privateKeys: livekey.key
         }))
       })
 
@@ -1309,7 +1311,7 @@ describe('OpgpService', () => {
         .toHaveBeenCalledWith(jasmine.objectContaining({
           message: message,
           publicKeys: [ livekey.key ],
-          privateKey: livekey.key
+          privateKeys: livekey.key
         }))
       })
 
@@ -1336,7 +1338,7 @@ describe('OpgpService', () => {
       beforeEach(() => {
         cache.get.and.returnValue(livekey)
         openpgp.message.fromText.and.returnValue(message)
-        message.sign.and.returnValue(message)
+        message.sign.and.returnValue(Promise.resolve(message))
         message.armor.and.returnValue('signed-armor-text')
       })
 
@@ -1451,7 +1453,7 @@ describe('OpgpService', () => {
       beforeEach(() => {
         cache.get.and.returnValue(livekey)
         openpgp.message.readArmored.and.returnValue(message)
-        message.verify.and.returnValue([ { keyid: 'keyid', valid: true }])
+        message.verify.and.returnValue(Promise.resolve([ { keyid: 'keyid', valid: true }]))
         message.getText.and.returnValue('plain-text')
       })
 
@@ -1486,11 +1488,11 @@ describe('OpgpService', () => {
       beforeEach(() => {
         cache.get.and.returnValue(livekey)
         openpgp.message.readArmored.and.returnValue(message)
-        message.verify.and.returnValue([
+        message.verify.and.returnValue(Promise.resolve([
           { keyid: 'verified-keyid', valid: true },
           { keyid: 'wrong-keyid', valid: false },
           { keyid: 'another-wrong-keyid', valid: false }
-        ])
+        ]))
       })
 
       beforeEach((done) => {

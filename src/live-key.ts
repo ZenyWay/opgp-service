@@ -1,5 +1,7 @@
-/*
- * Copyright 2017 Stephane M. Catala
+/**
+ * Copyright 2018 Stephane M. Catala
+ * @author Stephane M. Catala
+ * @license Apache@2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -11,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * Limitations under the License.
  */
-;
+//
 import { OpgpKeyBlueprint, OpgpKeyId } from './proxy-key'
-import { isString } from './utils'
 import * as base64 from 'base64-js'
 import Promise = require('bluebird')
 
@@ -30,6 +31,7 @@ export interface LiveKeyFactoryConfig {
    */
   openpgp: any
 }
+
 /**
  * @function
  * @interface LiveKeyFactory
@@ -44,7 +46,7 @@ export interface LiveKeyFactoryConfig {
  * @memberOf LiveKeyClass
  */
 export interface LiveKeyFactory {
-  (key: any, opts?: LiveKeyFactoryOpts): OpgpLiveKey
+  (key: any, opts?: LiveKeyFactoryOpts): Promise<OpgpLiveKey>
 }
 
 export interface LiveKeyFactoryOpts {}
@@ -144,7 +146,7 @@ export interface OpgpLiveKey {
    *
    * @memberOf LiveKeyClass
    */
-  verify (armor: string, opts?: LiveKeyVerfyOpts): Promise<string|false>
+  verify (armor: string, opts?: LiveKeyVerfyOpts): Promise<string | false>
 }
 
 export interface LiveKeyLockOpts {}
@@ -162,8 +164,9 @@ export interface LiveKeyVerfyOpts {}
  * @implements {LiveKey}
  */
 class LiveKeyClass implements OpgpLiveKey {
-  static getFactory: LiveKeyFactoryBuilder
-  = function (config: LiveKeyFactoryConfig): LiveKeyFactory {
+  static getFactory: LiveKeyFactoryBuilder = function (
+    config: LiveKeyFactoryConfig
+  ): LiveKeyFactory {
     const utils = new OpenpgpKeyUtils(config.openpgp)
 
     return LiveKeyClass.getInstance.bind(LiveKeyClass, utils)
@@ -176,44 +179,79 @@ class LiveKeyClass implements OpgpLiveKey {
   toPublicKey (): Promise<OpgpLiveKey> {
     return this.bp.isPublic
     ? Promise.resolve(this)
-    : Promise.try(() => this.key.toPublic())
-    .then(key => new LiveKeyClass(this.utils, key, this.utils.getKeyBlueprint(key)))
+    : Promise.try<OpgpLiveKey>(() => this.key.toPublic())
+      .then(
+        key => this.utils.getKeyBlueprint(key).then(
+          bp => new LiveKeyClass(this.utils, key, bp)
+        )
+      )
   }
 
   unlock (passphrase: string, opts?: LiveKeyUnlockOpts): Promise<OpgpLiveKey> {
-  	return !this.bp.isLocked ? Promise.reject(new Error('key not locked'))
-    : Promise.try(() => {
-      const clone = this.utils.cloneKey(this.key) // mutate clone, not this.key
-      const unlocked = clone.decrypt(passphrase)
-      return unlocked ? LiveKeyClass.getInstance(this.utils, clone)
-      : Promise.reject(new Error('fail to unlock key'))
-    })
+    return !this.bp.isLocked
+    ? Promise.reject(new Error('key not locked'))
+    : Promise.try<OpgpLiveKey>(
+        () => {
+          const clone = this.utils.cloneKey(this.key) // mutate clone, not this.key
+          return clone.decrypt(passphrase).then(
+            (unlocked: boolean) => unlocked
+              ? LiveKeyClass.getInstance(this.utils, clone)
+              : Promise.reject(new Error('fail to unlock key'))
+          )
+        }
+      )
   }
 
   lock (passphrase: string, opts?: LiveKeyLockOpts): Promise<OpgpLiveKey> {
-  	return this.bp.isLocked ? Promise.reject(new Error('key not unlocked'))
-    : Promise.try(() => {
-        this.key.encrypt(passphrase)
-        return LiveKeyClass.getInstance(this.utils, this.key)
-      })
-      .finally (() => delete this.key) // systematically invalidate this {LiveKey}
+    return this.bp.isLocked
+    ? Promise.reject(new Error('key not unlocked'))
+    : Promise.try<OpgpLiveKey>(
+        () => this.key.encrypt(passphrase) // key packets are mutated !
+          .then(
+            (/* Array<keyPacket> */) => LiveKeyClass.getInstance(
+              this.utils,
+              this.key
+            )
+          )
+      )
+      .finally(() => delete this.key) // systematically invalidate this {LiveKey}
   }
 
+  /**
+   * WARNING: this method is not tested
+   */
   sign (text: string, opts?: LiveKeySignOpts): Promise<string> {
-    return Promise.try(() =>
-      this.utils.openpgp.message.fromText(text).sign([ this.key ]).armor())
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('WARNING: opgp-service/live-key#sign method is not tested.')
+    }
+    return Promise.try<string>(
+      () => this.utils.openpgp.message.fromText(text)
+      .sign([ this.key ]).then((signed: any) => signed.armor())
+    )
   }
 
-  verify (armor: string, opts?: LiveKeyVerfyOpts): Promise<string|false> {
-    return Promise.try(() => {
-    	const message = this.utils.openpgp.message.readArmored(armor)
-    	const auth = message.verify([ this.key ])
-      return !!auth.length && auth[0].valid && message.getText()
-    })
+  /**
+   * WARNING: this method is not tested
+   */
+  verify (armor: string, opts?: LiveKeyVerfyOpts): Promise<string | false> {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('WARNING: opgp-service/live-key#verify method is not tested.')
+    }
+    return Promise.try<string | false>(
+      () => {
+        const message = this.utils.openpgp.message.readArmored(armor)
+        return message.verify([ this.key ])
+        .then(
+          (auth: any[]) => !!auth.length && auth[0].valid
+            ? message.getText()
+            : Promise.reject(new Error('authentication failed'))
+        )
+      }
+    )
   }
 
   constructor (
-    private readonly utils: any,
+    private readonly utils: OpenpgpKeyUtils,
     public key: any,
     public readonly bp: OpgpKeyBlueprint
   ) {}
@@ -232,10 +270,13 @@ class LiveKeyClass implements OpgpLiveKey {
    * @type {LiveKeyFactory}
    * @memberOf LiveKeyClass
    */
-	private static getInstance (utils: OpenpgpKeyUtils, key: any, opts?: LiveKeyFactoryOpts): OpgpLiveKey {
-    const bp = utils.getKeyBlueprint(key)
-
-    return new LiveKeyClass(utils, key, bp)
+  private static getInstance (
+    utils: OpenpgpKeyUtils,
+    key: any,
+    opts?: LiveKeyFactoryOpts
+  ): Promise<OpgpLiveKey> {
+    return utils.getKeyBlueprint(key)
+    .then(bp => new LiveKeyClass(utils, key, bp))
   }
 }
 
@@ -257,20 +298,19 @@ class OpenpgpKeyUtils {
    *
    * @memberOf OpenpgpKeyUtils
    */
-  getKeyBlueprint (key: any): OpgpKeyBlueprint {
-    const packets = key.getAllKeyPackets()
+  getKeyBlueprint (key: any): Promise<OpgpKeyBlueprint> {
+    const primary = this._getPrimaryOpgpKeyId(key)
 
-    const primary = this.getOpgpKeyId(key, packets[0])
+    const subkeys = Promise.all<OpgpKeyId>(
+      key.subKeys.map((subkey: any) => this._getSubkeyOpgpKeyId(key, subkey))
+    )
 
-    const subkeys = packets.slice(1)
-    .map((packet: any, index: number) => this.getOpgpKeyId(key, packet, index))
-
-    return {
+    return Promise.all([ primary, subkeys ]).then(([ primary, subkeys ]) => ({
       isLocked: isLocked(key),
-      isPublic: <boolean> key.isPublic(),
+      isPublic: key.isPublic() as boolean,
       keys: [ primary ].concat(subkeys),
-      user: { ids: <string[]> key.getUserIds() }
-    }
+      user: { ids: key.getUserIds() as string[] }
+    }))
   }
 
   /**
@@ -283,7 +323,7 @@ class OpenpgpKeyUtils {
    *
    * @memberOf OpenpgpKeyUtils
    */
-  getHashes (packet: any): {hash:string,fingerprint:string} {
+  getHashes (packet: any): { hash: string, fingerprint: string } {
     return {
       hash: this.getFingerprintHash(packet),
       fingerprint: packet.getFingerprint()
@@ -300,12 +340,12 @@ class OpenpgpKeyUtils {
    *
    * @memberOf OpenpgpKeyUtils
    */
-  getPrimaryKeyType (key: any): {isAuth:boolean,isCiph:boolean} {
+  getPrimaryKeyType (key: any): { isAuth: boolean, isCiph: boolean } {
     const primary = this.cloneKey(key)
-    primary.subKeys = null
+    primary.subKeys = []
     return {
-      isAuth: !!primary.getSigningKeyPacket(),
-      isCiph: !!primary.getEncryptionKeyPacket()
+      isAuth: !!primary.getSigningKey(),
+      isCiph: !!primary.getEncryptionKey()
     }
   }
 
@@ -348,36 +388,22 @@ class OpenpgpKeyUtils {
    * @method
    *
    * @param {*} key
-   * @param {*} packet of primary or subkey
-   * @param {number=} index of subkey
-   *
-   * @returns {OpgpKeyId}
-   *
-   * @memberOf OpenpgpKeyUtils
-   */
-  private getOpgpKeyId (key: any, packet: any, index?: number): OpgpKeyId {
-    return typeof index === 'undefined' ? this.getPrimaryOpgpKeyId(key, packet)
-    : this.getSubkeyOpgpKeyId(key, packet, index)
-  }
-
-  /**
-   * @private
-   * @method
-   *
-   * @param {*} key
    * @param {*} packet
    *
    * @returns {OpgpKeyId}
    *
    * @memberOf OpenpgpKeyUtils
    */
-  private getPrimaryOpgpKeyId (key: any, packet: any): OpgpKeyId {
-    return {
-      ...this.getHashes(packet),
+  private _getPrimaryOpgpKeyId (key: any): Promise<OpgpKeyId> {
+    const expires = key.getExpirationTime().then((date: Date) => date.valueOf())
+    const status: Promise<number> = key.verifyPrimaryKey()
+    return Promise.all([ expires, status ])
+    .then(([ expires, status ]) => ({
+      ...this.getHashes(key.primaryKey),
       ...this.getPrimaryKeyType(key),
-      status: key.verifyPrimaryKey(),
-      expires: getExpiry(key)
-    }
+      status,
+      expires: expires.valueOf()
+    }))
   }
 
   /**
@@ -392,15 +418,14 @@ class OpenpgpKeyUtils {
    *
    * @memberOf OpenpgpKeyUtils
    */
-  private getSubkeyOpgpKeyId (key: any, packet: any, index: number): OpgpKeyId {
-    const subkey = key.subKeys[index]
-
-    return { ...this.getHashes(packet),
-      isCiph: subkey.isValidEncryptionKey(key.primaryKey),
-      isAuth: subkey.isValidSigningKey(key.primaryKey),
-      status: subkey.verify(key.primaryKey),
-      expires: getExpiry(subkey)
-    }
+  private _getSubkeyOpgpKeyId (key: any, subkey: any): Promise<OpgpKeyId> {
+    return subkey.verify(key.primaryKey)
+    .then((status: number) => ({ ...this.getHashes(subkey.keyPacket),
+      isCiph: !!key.getEncryptionKey(subkey.getKeyId()),
+      isAuth: !!key.getSigningKey(subkey.getKeyId()),
+      status,
+      expires: subkey.getExpirationTime().valueOf()
+    }))
   }
 }
 
@@ -413,20 +438,7 @@ class OpenpgpKeyUtils {
  * @returns {boolean}
  */
 function isLocked (key: any): boolean {
-  return !key.primaryKey.isDecrypted
-}
-
-/**
- * @private
- * @function
- *
- * @param {*} key openpgp key
- *
- * @returns {number} milliseconds since EPOCH
- */
-function getExpiry (key: any): number {
-	const expires = key.getExpirationTime()
-	return expires ? expires.getTime() : Infinity
+  return !key.primaryKey.isDecrypted()
 }
 
 const getLiveKeyFactory: LiveKeyFactoryBuilder = LiveKeyClass.getFactory

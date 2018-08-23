@@ -12,6 +12,11 @@ together with [worker-proxy](https://www.npmjs.com/package/worker-proxy),
 this service can [easily be run in a WebWorker](https://gist.github.com/smcatala/bee0f411b08ec45933cb69264812a62e),
 confining the cryptographic material into a dedicated thread.
 
+ES5. Typescript support. 36kB gzip, excluding [openpgp](https://openpgpjs.org/).
+
+based on [openpgp@^3.1.2](https://openpgpjs.org/),
+[audited](https://protonmail.com/blog/openpgpjs-protonmail-security-audit/) by [Cure53](https://cure53.de/) in summer 2018.
+
 ## cryptographic material is encapsulated
 client code operates on mere proxies of the openpgp keys, not the latter.
 
@@ -79,7 +84,7 @@ it is in fact fully async.
 
 the files of this example are available [in the `example` folder](./spec/example).
 
-a live version of this example can be viewed [in the browser console](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.3.1/spec/example/index.html),
+a live version of this example can be viewed [in the browser console](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.4.0/spec/example/index.html),
 or by cloning this repository and running the following commands from a terminal:
 ```bash
 npm install
@@ -95,16 +100,16 @@ the current version exposes the following service methods:
 * sign, verify
 
 for a detailed specification of the API
-* run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.3.1/spec/web/index.html)
+* run the [unit tests](https://cdn.rawgit.com/ZenyWay/opgp-service/v2.4.0/spec/web/index.html)
 in your browser,
-* or check the [public interface declaration](./src/index.ts#L38-L271)
+* or check the [public interface declaration](./src/index.ts#L26-L469)
 in the source code.
 
 # <a name="contributing"></a> CONTRIBUTING
 see the [contribution guidelines](./CONTRIBUTING.md)
 
 # <a name="license"></a> LICENSE
-Copyright 2017 Stéphane M. Catala
+Copyright 2018 Stéphane M. Catala
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

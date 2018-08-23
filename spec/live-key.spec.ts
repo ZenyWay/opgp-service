@@ -1,5 +1,7 @@
-/*
- * Copyright 2017 Stephane M. Catala
+/**
+ * Copyright 2018 Stephane M. Catala
+ * @author Stephane M. Catala
+ * @license Apache@2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -11,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * Limitations under the License.
  */
-;
+//
 import getLiveKeyFactory from '../src/live-key'
 import * as base64 from 'base64-js'
 
 let getLiveKey: any
-let openpgp: any
+let openpgp: any // API from openpgp@3.1.2
 let key: any
+let keyId: any
+let primaryKey: any
 let subkeys: any
 let packets: any
 let msg: any
@@ -32,14 +36,14 @@ beforeEach(() => { // mock dependencies
     message: jasmine.createSpyObj('message', [ 'fromText', 'readArmored' ])
   }
 
+  keyId = { bytes: 'key-id' }
   key = jasmine.createSpyObj('key', [
     'armor',
     'toPublic',
-    'getAllKeyPackets',
     'isPublic',
     'getUserIds',
-    'getSigningKeyPacket',
-    'getEncryptionKeyPacket',
+    'getSigningKey',
+    'getEncryptionKey',
     'verifyPrimaryKey',
     'getExpirationTime',
     'encrypt',
@@ -54,22 +58,30 @@ beforeEach(() => { // mock dependencies
 
   subkeys = [ 0, 1, 2 ] // 3 subkeys
   .map(subkey => jasmine.createSpyObj(`subkey${subkey}`, [
-    'isValidEncryptionKey',
-    'isValidSigningKey',
     'verify',
+    'getKeyId',
     'getExpirationTime'
   ]))
 
   msg = jasmine.createSpyObj('msg', [ 'sign', 'verify' ])
 
   key.armor.and.returnValue('key-armor')
-  key.getAllKeyPackets.and.returnValue(packets)
   key.isPublic.and.returnValue(false)
   key.getUserIds.and.returnValue([ 'user@test.io' ])
-  key.getSigningKeyPacket.and.returnValue(packets[0])
-  key.getEncryptionKeyPacket.and.returnValue(packets[0])
-  key.verifyPrimaryKey.and.returnValue(6510)
-  // key.getExpirationTime.and.returnValue()
+  key.getSigningKey.and.returnValue(packets[0])
+  key.getEncryptionKey.and.returnValue(packets[0])
+  key.verifyPrimaryKey.and.returnValue(Promise.resolve(6510))
+  key.getExpirationTime.and.returnValue(Promise.resolve(Infinity))
+
+  primaryKey = jasmine.createSpyObj('primaryKey', [
+    'isDecrypted',
+    'getFingerprint',
+    'writeOld'
+  ])
+  primaryKey.isDecrypted.and.returnValue(false)
+  primaryKey.getFingerprint.and.returnValue('0')
+  primaryKey.writeOld.and.returnValue([ `old-primary-key-bytes` ])
+  key.primaryKey = primaryKey
 
   packets.forEach((packet: any, index: number) => {
     packet.getFingerprint.and.returnValue(index.toString())
@@ -77,19 +89,17 @@ beforeEach(() => { // mock dependencies
   })
 
   subkeys.forEach((subkey: any, index: number) => {
-    subkey.isValidEncryptionKey.and.returnValue(true)
-    subkey.isValidSigningKey.and.returnValue(true)
-    subkey.verify.and.returnValue(6511 + index)
+    subkey.verify.and.returnValue(Promise.resolve(6511 + index))
+    subkey.getKeyId.and.returnValue({ ...keyId })
     subkey.getExpirationTime.and.returnValue(new Date(1984 - index))
+    subkey.keyPacket = packets[index + 1]
   })
-
-  key.primaryKey = { isDecrypted: false }
   key.subKeys = subkeys
 
   cloneKey = function (key: any): any {
     const clone = { ...key }
-    clone.primaryKey = { isDecrypted: key.primaryKey.isDecrypted }
-    clone.subKeys = key.subKeys.slice()
+    clone.primaryKey = { ...key.primaryKey }
+    clone.subKeys = key.subKeys.map((subkey: any) => ({ ...subkey }))
     return clone
   }
 
@@ -135,21 +145,32 @@ describe('default export: ' +
 })
 
 describe('LiveKeyFactory: ' +
-'getLiveKey (key: any, opts?: LiveKeyFactoryOpts): OpgpLiveKey', () => {
+'getLiveKey (key: any, opts?: LiveKeyFactoryOpts): Promise<OpgpLiveKey>', () => {
   let livekey: any
-  beforeEach(() => {
-    livekey = getLiveKey(key)
+  let error: any
+
+  beforeEach((done) => {
+    getLiveKey(key).then(
+      (res: any) =>
+        livekey = res
+    )
+    .catch((err: any) => error = err)
+    .finally(() => setTimeout(done))
   })
 
-  it('returns a {OpgpLiveKey} instance that wraps the given openpgp key', () => {
+  it('return a Promise that resolves to a {OpgpLiveKey} instance, ' +
+  'that wraps the given openpgp key', () => {
     expect(livekey).toEqual(jasmine.objectContaining(livekeyInterface))
+    expect(error).toBeUndefined()
   })
 })
 
 describe('OpgpLiveKey', () => {
   let livekey: any
-  beforeEach(() => {
-    livekey = getLiveKey(key)
+
+  beforeEach((done) => {
+    getLiveKey(key).then((res: any) => livekey = res)
+    .finally(() => setTimeout(done))
   })
 
   describe('bp: OpgpKeyBlueprint', () => {
@@ -244,7 +265,12 @@ describe('OpgpLiveKey', () => {
       let result: any
       let publicLivekey: any
       beforeEach((done) => {
-        publicLivekey = getLiveKey(publickey)
+        getLiveKey(publickey)
+        .then((res: any) => publicLivekey = res)
+        .finally(() => setTimeout(done))
+      })
+
+      beforeEach((done) => {
         publicLivekey.toPublicKey()
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
@@ -287,7 +313,8 @@ describe('OpgpLiveKey', () => {
     let unlocked: any
     beforeEach(() => {
       unlocked = cloneKey(key)
-      unlocked.primaryKey.isDecrypted = true
+      unlocked.primaryKey.isDecrypted = jasmine.createSpy('isDecrypted')
+      .and.returnValue(true)
     })
 
     describe('when given the correct passphrase', () => {
@@ -296,7 +323,8 @@ describe('OpgpLiveKey', () => {
       beforeEach((done) => {
         openpgp.key.readArmored.and.callFake(() => {
           const clone = cloneKey(unlocked)
-          clone.decrypt = jasmine.createSpy('decrypt').and.returnValue(true)
+          clone.decrypt = jasmine.createSpy('decrypt')
+          .and.returnValue(Promise.resolve(true))
           return { keys: [ clone ] }
         })
 
@@ -314,7 +342,7 @@ describe('OpgpLiveKey', () => {
       })
       it('does not change the state of its {OpgpLiveKey} instance', () => {
         expect(livekey.key).toBe(key)
-        expect(livekey.key.primaryKey.isDecrypted).toBe(false)
+        expect(livekey.key.primaryKey.isDecrypted()).toBe(false)
         expect(livekey.bp.isLocked).toBe(true)
         expect(livekey.key.decrypt).not.toHaveBeenCalled()
       })
@@ -324,7 +352,7 @@ describe('OpgpLiveKey', () => {
       let error: any
       let result: any
       beforeEach((done) => {
-        key.decrypt.and.returnValue(false)
+        key.decrypt.and.returnValue(Promise.resolve(false))
 
         livekey.unlock('incorrect passphrase')
         .then((res: any) => result = res)
@@ -340,7 +368,7 @@ describe('OpgpLiveKey', () => {
       })
       it('does not change the state of its {OpgpLiveKey} instance', () => {
         expect(livekey.key).toBe(key)
-        expect(livekey.key.primaryKey.isDecrypted).toBe(false)
+        expect(livekey.key.primaryKey.isDecrypted()).toBe(false)
         expect(livekey.bp.isLocked).toBe(true)
       })
     })
@@ -349,8 +377,12 @@ describe('OpgpLiveKey', () => {
       let error: any
       let result: any
       beforeEach((done) => {
-        livekey = getLiveKey(unlocked)
+        getLiveKey(unlocked)
+        .then((res: any) => livekey = res)
+        .finally(() => setTimeout(done))
+      })
 
+      beforeEach((done) => {
         livekey.unlock('passphrase')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
@@ -364,7 +396,7 @@ describe('OpgpLiveKey', () => {
       })
       it('does not change the state of its {OpgpLiveKey} instance', () => {
         expect(livekey.key).toBe(unlocked)
-        expect(livekey.key.primaryKey.isDecrypted).toBe(true)
+        expect(livekey.key.primaryKey.isDecrypted()).toBe(true)
         expect(livekey.bp.isLocked).toBe(false)
       })
     })
@@ -373,7 +405,7 @@ describe('OpgpLiveKey', () => {
       let error: any
       let result: any
       beforeEach((done) => {
-        key.decrypt.and.throwError('boom')
+        key.decrypt.and.returnValue(Promise.reject(new Error('boom')))
 
         livekey.unlock('passphrase')
         .then((res: any) => result = res)
@@ -388,7 +420,7 @@ describe('OpgpLiveKey', () => {
       })
       it('does not change the state of its {OpgpLiveKey} instance', () => {
         expect(livekey.key).toBe(key)
-        expect(livekey.key.primaryKey.isDecrypted).toBe(false)
+        expect(livekey.key.primaryKey.isDecrypted()).toBe(false)
         expect(livekey.bp.isLocked).toBe(true)
       })
     })
@@ -399,7 +431,8 @@ describe('OpgpLiveKey', () => {
     let unlocked: any
     beforeEach(() => {
       unlocked = cloneKey(key)
-      unlocked.primaryKey.isDecrypted = true
+      unlocked.primaryKey.isDecrypted = jasmine.createSpy('isDecrypted')
+      .and.returnValue(true)
     })
 
     describe('when given a passphrase', () => {
@@ -407,9 +440,18 @@ describe('OpgpLiveKey', () => {
       let result: any
       beforeEach((done) => {
         unlocked.encrypt = jasmine.createSpy('encrypt')
-        .and.callFake(() => unlocked.primaryKey.isDecrypted = false)
-        livekey = getLiveKey(unlocked)
+        .and.callFake(function () {
+          // key packets are mutated !
+          unlocked.primaryKey.isDecrypted.and.returnValue(false)
+          return Promise.resolve(/* Array<keyPacket> */)
+        })
 
+        getLiveKey(unlocked)
+        .then((res: any) => livekey = res)
+        .finally(() => setTimeout(done))
+      })
+
+      beforeEach((done) => {
         livekey.lock('passphrase')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
@@ -444,7 +486,7 @@ describe('OpgpLiveKey', () => {
       })
       it('does not change the state of its {OpgpLiveKey} instance', () => {
         expect(livekey.key).toBe(key)
-        expect(livekey.key.primaryKey.isDecrypted).toBe(false)
+        expect(livekey.key.primaryKey.isDecrypted()).toBe(false)
         expect(livekey.bp.isLocked).toBe(true)
       })
     })
@@ -453,9 +495,14 @@ describe('OpgpLiveKey', () => {
       let error: any
       let result: any
       beforeEach((done) => {
-        key.encrypt.and.throwError('boom');
-        livekey = getLiveKey(unlocked)
+        key.encrypt.and.returnValue(Promise.reject(new Error('boom')))
 
+        getLiveKey(unlocked)
+        .then((res: any) => livekey = res)
+        .finally(() => setTimeout(done))
+      })
+
+      beforeEach((done) => {
         livekey.lock('incorrect passphrase')
         .then((res: any) => result = res)
         .catch((err: any) => error = err)
