@@ -521,9 +521,7 @@ class OpgpServiceClass {
     : (
       !isValidKeyOpts(opts)
       ? reject('invalid key options')
-      : Promise.try(() => this.openpgp.key.generate(toKeySpec(user, opts)))
-        .then((key: any) => this.getLiveKey(key))
-        .then(key => this.cacheAndProxyKey(key))
+      : this._generateKey(toKeySpec(user, opts))
     )
   }
 
@@ -532,7 +530,7 @@ class OpgpServiceClass {
     .then(
       key => key.bp.isPublic
       ? this.getProxyKey(getHandle(keyRef) as string, key.bp) // handle is available after this#getCachedLiveKey
-      : key.toPublicKey().then(key => this.cacheAndProxyKey(key)) // cache a new public ProxyKey instance
+      : key.toPublicKey().then(key => this._cacheAndProxyKey(key)) // cache a new public ProxyKey instance
     )
   }
 
@@ -546,7 +544,7 @@ class OpgpServiceClass {
         this.openpgp.key.readArmored(armor).keys
         .map(
           (key: any) => this.getLiveKey(key)
-            .then(key => this.cacheAndProxyKey(key))
+            .then(key => this._cacheAndProxyKey(key))
         )
 
         return Promise.all(keys)
@@ -567,7 +565,7 @@ class OpgpServiceClass {
     return !isString(passphrase)
     ? reject('invalid passphrase: not a string')
     : Promise.try(() => this._getCachedLiveKey(keyRef).unlock(passphrase))
-      .then(unlocked => this.cacheAndProxyKey(unlocked))
+      .then(unlocked => this._cacheAndProxyKey(unlocked))
   }
 
   lock (
@@ -588,7 +586,7 @@ class OpgpServiceClass {
           return livekey.lock(passphrase) // mutates original key, regardless of outcome !
         }
       )
-      .then(locked => this.cacheAndProxyKey(locked))
+      .then(locked => this._cacheAndProxyKey(locked))
   }
 
   encrypt (
@@ -600,8 +598,8 @@ class OpgpServiceClass {
     ? reject('invalid plain text: not a string')
     : Promise.try(
         () => this.openpgp.encrypt({
-          privateKeys: this.getCachedPrivateOpenpgpKeys(keyRefs.auth),
-          publicKeys: this.getCachedOpenpgpKeys(keyRefs.cipher),
+          privateKeys: this._getCachedPrivateOpenpgpKeys(keyRefs.auth),
+          publicKeys: this._getCachedOpenpgpKeys(keyRefs.cipher),
           data: plain
         })
       )
@@ -617,12 +615,19 @@ class OpgpServiceClass {
     ? reject('invalid cipher: not a string')
     : Promise.try(
         () => this.openpgp.decrypt({
-          privateKeys: this.getCachedPrivateOpenpgpKeys(keyRefs.cipher)[0],
-          publicKeys: this.getCachedOpenpgpKeys(keyRefs.auth),
+          privateKeys: this._getCachedPrivateOpenpgpKeys(keyRefs.cipher)[0],
+          publicKeys: this._getCachedOpenpgpKeys(keyRefs.auth),
           message: this.openpgp.message.readArmored(cipher)
         })
       )
-      .get('data')
+      .then(
+        function ({ data, signatures }: { data: string, signatures: any[] }) {
+          const invalid = getKeysOfInvalidSignatures(signatures).join()
+          return invalid
+          ? reject('authentication failed: ' + invalid)
+          : data
+        }
+      )
   }
 
   sign (
@@ -630,9 +635,9 @@ class OpgpServiceClass {
     text: string,
     opts?: SignOpts
   ): Promise<string> {
-    return Promise.try<string>(
+    return Promise.try(
       () => {
-        const keys = this.getCachedOpenpgpKeys(keyRefs)
+        const keys = this._getCachedOpenpgpKeys(keyRefs)
 
         if (!isString(text)) { return reject('invalid text: not a string') }
         const message = this.openpgp.message.fromText(text)
@@ -647,24 +652,20 @@ class OpgpServiceClass {
     armor: string,
     opts?: VerifyOpts
   ): Promise<string> {
-    return Promise.try<string>(
+    return Promise.try(
       () => {
-        const keys = this.getCachedOpenpgpKeys(keyRefs)
+        const keys = this._getCachedOpenpgpKeys(keyRefs)
 
         if (!isString(armor)) { return reject('invalid armor: not a string') }
         const message = this.openpgp.message.readArmored(armor)
 
         return message.verify(keys)
         .then(
-          function (keys: any[]) {
-            const invalid = keys
-            .filter(key => !key.valid)
-            .map(key => key.keyid)
-            .join()
-
-            return !invalid
-            ? message.getText()
-            : reject('authentication failed: ' + invalid)
+          function (verified: any[]) {
+            const invalid = getKeysOfInvalidSignatures(verified).join()
+            return invalid
+            ? reject('authentication failed: ' + invalid)
+            : message.getText()
           }
         )
       }
@@ -693,6 +694,15 @@ class OpgpServiceClass {
     'verify'
   ]
 
+  private _generateKey (spec: OpenpgpKeySpec): Promise<OpgpProxyKey> {
+    const { unlocked, ...opts } = spec
+    return Promise.try(() => this.openpgp.key.generate(opts))
+      .then(key => Object.assign(key, { revocationSignatures: [] })) // ignore revocation certificate
+      .then(key => !unlocked ? key : unlockKey(key, opts.passphrase))
+      .then(key => this.getLiveKey(key))
+      .then(livekey => this._cacheAndProxyKey(livekey))
+  }
+
   /**
    * @private
    * @method
@@ -707,7 +717,7 @@ class OpgpServiceClass {
    *
    * @memberOf OpgpServiceClass
    */
-  _getCachedLiveKey (keyRef: KeyRef): OpgpLiveKey {
+  private _getCachedLiveKey (keyRef: KeyRef): OpgpLiveKey {
     const handle = getHandle(keyRef)
     const livekey = handle && this.cache.get(handle)
     if (!livekey) {
@@ -732,7 +742,7 @@ class OpgpServiceClass {
    *
    * @memberOf OpgpServiceClass
    */
-  getCachedLiveKeys (keyRefs: KeyRef[] | KeyRef): OpgpLiveKey[] {
+  private _getCachedLiveKeys (keyRefs: KeyRef[] | KeyRef): OpgpLiveKey[] {
     const refs = [].concat(keyRefs)
     if (!refs.length) { throw new Error('no key references') }
 
@@ -755,8 +765,8 @@ class OpgpServiceClass {
    *
    * @memberOf OpgpServiceClass
    */
-  getCachedOpenpgpKeys (keyRefs: KeyRef[] | KeyRef): any[] {
-    return this.getCachedLiveKeys(keyRefs).map(livekey => livekey.key)
+  private _getCachedOpenpgpKeys (keyRefs: KeyRef[] | KeyRef): any[] {
+    return this._getCachedLiveKeys(keyRefs).map(livekey => livekey.key)
   }
 
   /**
@@ -777,8 +787,8 @@ class OpgpServiceClass {
    *
    * @memberOf OpgpServiceClass
    */
-  getCachedPrivateOpenpgpKeys (keyRefs: KeyRef[] | KeyRef): any[] {
-    const keys = this.getCachedLiveKeys(keyRefs)
+  private _getCachedPrivateOpenpgpKeys (keyRefs: KeyRef[] | KeyRef): any[] {
+    const keys = this._getCachedLiveKeys(keyRefs)
     if (keys.some(key => key.bp.isLocked)) {
       throw new Error('private key not unlocked')
     }
@@ -799,14 +809,31 @@ class OpgpServiceClass {
    *
    * @memberOf OpgpServiceClass
    */
-  cacheAndProxyKey (livekey: OpgpLiveKey): OpgpProxyKey {
+  private _cacheAndProxyKey (livekey: OpgpLiveKey): OpgpProxyKey {
     const handle = this.cache.set(livekey)
     if (!handle) { throw new Error('fail to cache key') }
     return this.getProxyKey(handle, livekey.bp)
   }
 }
 
-function reject (reason: string): Promise<never> {
+function unlockKey (key: any, passphrase: string) {
+  return key.decrypt(passphrase).then(
+    (unlocked: boolean) => !unlocked
+    ? reject('fail to unlock key')
+    : key
+  )
+}
+
+function getKeysOfInvalidSignatures (
+  verifications: { keyid: string, valid: boolean }[]
+) {
+  return verifications.filter(({ valid }) => !valid).map(({ keyid }) => keyid)
+}
+/*
+}
+*/
+
+function reject <T> (reason: string): Promise<T> {
   return Promise.reject(new Error(reason))
 }
 
@@ -945,18 +972,45 @@ interface OpenpgpKeySpec {
   userIds: UserId[]
   passphrase?: string
   numBits?: number
+  date?: Date
+  keyExpirationTime?: number
+  subkeys?: OpenpgpKeySpec[]
   unlocked?: false
 }
 
-function toKeySpec (user: UserId[] | UserId, opts: OpgpKeyOpts) {
-  const config = { user: [].concat(user), ...OPGP_KEY_DEFAULTS, ...opts }
+function toKeySpec (
+  user: UserId[] | UserId,
+  opts: OpgpKeyOpts
+): OpenpgpKeySpec {
+  if (!Array.isArray(user)) { return toKeySpec([user], opts) }
+  const config = {
+    ...OPGP_KEY_DEFAULTS,
+    ...opts,
+    user: user.map(normalizeUser)
+  }
   const spec = {
     userIds: config.user,
     numBits: config.size,
+    date: new Date(),
+    keyExpirationTime: 0, // currently not supported
+    subkeys: [{}], // compatible with openpgp@2: subkey specs = primary specs
     unlocked: config.unlocked
   } as OpenpgpKeySpec
   if (config.passphrase) { spec.passphrase = config.passphrase }
   return spec
+}
+
+const IS_EMAIL_LIKE = /^[^@]+@[^@]+$/
+/**
+ * map {UserId} to {string}.
+ * openpgp@3.1.2 requires the user id to be a RFC2822-compliant email address.
+ * when the input {UserId} is a string which does not resemble an email address,
+ * appends '@opgp-service.npm.com' to that string.
+ */
+function normalizeUser (user: UserId): string {
+  return isString(user)
+  ? IS_EMAIL_LIKE.test(user) ? user : `${user}@opgp-service.npm.com`
+  : user.name ? `${user.name} <${user.email}>` : user.email
 }
 
 const getOpgpService = OpgpServiceClass.getInstance

@@ -248,10 +248,11 @@ describe('OpgpService', () => {
       .catch(() => { /* no operation */ }) // ignore
       .finally(() => {
         expect(openpgp.key.generate).toHaveBeenCalledWith(jasmine.objectContaining({
-          userIds: jasmine.arrayContaining([ 'john.doe@test.com' ]),
+          userIds: [ 'john.doe@test.com' ],
           passphrase: 'secret passphrase',
           numBits: 4096,
-          unlocked: false
+          subkeys: [{}],
+          keyExpirationTime: 0
         }))
         setTimeout(done)
       })
@@ -287,6 +288,41 @@ describe('OpgpService', () => {
         expect(result).toEqual(jasmine.objectContaining({ handle: 'key-handle' }))
         expect(result).toEqual(jasmine.objectContaining(livekey.bp))
         expect(error).not.toBeDefined()
+      })
+
+      describe('when `opts.unlocked` is `true`', function () {
+        let error: any
+        let result: any
+
+        beforeEach(() => {
+          result = []
+          livekey.key.decrypt = jasmine.createSpy('decrypt')
+          .and.callFake(function () {
+            result.push('decrypt')
+            return Promise.resolve(true)
+          })
+          getLiveKey.and.callFake(function () {
+            result.push('get-live-key')
+            return Promise.resolve(livekey)
+          })
+        })
+
+        beforeEach((done) => {
+          service.generateKey('john.doe@test.com', { unlocked: true })
+          .then((res: any) => result.push(res))
+          .catch((err: any) => error = err)
+          .finally(() => setTimeout(done))
+        })
+
+        it('unlocks the new openpgp key before creating ' +
+        'the corresponding {OpgpLiveKey}', function () {
+          expect(getLiveKey).toHaveBeenCalledWith(livekey.key)
+          expect(result).toEqual([
+            'decrypt',
+            'get-live-key',
+            jasmine.objectContaining({ handle: 'key-handle' })
+          ])
+        })
       })
     })
 
@@ -1159,7 +1195,13 @@ describe('OpgpService', () => {
         livekey.bp.isLocked = false
         cache.get.and.returnValue(livekey)
         openpgp.message.readArmored.and.returnValue(message)
-        openpgp.decrypt.and.returnValue({ data: 'plain text' })
+        openpgp.decrypt.and.returnValue({
+          data: 'plain text',
+          signatures: [{
+            keyid: 'valid-auth-key-handle',
+            valid: true
+          }]
+        })
       })
 
       beforeEach((done) => {
@@ -1273,6 +1315,60 @@ describe('OpgpService', () => {
         expect(result).not.toBeDefined()
         expect(error).toBeDefined()
         expect(error.message).toBe('private key not unlocked')
+      })
+    })
+
+    describe('when given a valid cipher text string with an invalid signature',
+    () => {
+      let error: any
+      let result: any
+      beforeEach(() => {
+        livekey.bp.isLocked = false
+        cache.get.and.returnValue(livekey)
+        openpgp.message.readArmored.and.returnValue(message)
+        openpgp.decrypt.and.returnValue({
+          data: 'plain text',
+          signatures: [{
+            keyid: 'auth-key-id',
+            valid: false
+          }]
+        })
+      })
+
+      beforeEach((done) => {
+        const refs = {
+          cipher: 'valid-cipher-key-handle',
+          auth: 'valid-auth-key-handle'
+        }
+        service.decrypt(Promise.resolve(refs), 'cipher text')
+        .then((res: any) => result = res)
+        .catch((err: any) => error = err)
+        .finally(() => setTimeout(done))
+      })
+
+      it('retrieves the {OpgpLiveKey} instances ' +
+      'referenced by the given handles when compliant', () => {
+        expect(cache.get.calls.allArgs()).toEqual([
+          [ 'valid-cipher-key-handle' ],
+          [ 'valid-auth-key-handle' ]
+        ])
+      })
+
+      it('delegates to the openpgp primitive', () => {
+        expect(openpgp.message.readArmored).toHaveBeenCalledWith('cipher text')
+        expect(openpgp.decrypt)
+        .toHaveBeenCalledWith(jasmine.objectContaining({
+          message: message,
+          publicKeys: [ livekey.key ],
+          privateKeys: livekey.key
+        }))
+      })
+
+      it('returns a Promise that rejects ' +
+      'with an `authentication failed: {authKeyId}` {Error}', () => {
+        expect(result).not.toBeDefined()
+        expect(error).toBeDefined()
+        expect(error.message).toBe('authentication failed: auth-key-id')
       })
     })
 

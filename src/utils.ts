@@ -11,16 +11,16 @@
  * See the License for the specific language governing permissions and
  * Limitations under the License.
  */
-;
-export function isString (val: any): val is string|String {
+
+export function isString (val: any): val is string | String {
   return typeof (val && val.valueOf()) === 'string'
 }
 
-export function isNumber (val: any): val is number|Number {
+export function isNumber (val: any): val is number | Number {
   return typeof (val && val.valueOf()) === 'number'
 }
 
-export function isBoolean (val: any): val is boolean|Boolean {
+export function isBoolean (val: any): val is boolean | Boolean {
   return typeof (val && val.valueOf()) === 'boolean'
 }
 
